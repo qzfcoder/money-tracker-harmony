@@ -68,6 +68,12 @@ struct AutoBookkeeping {
   @State ocrSummary: string = '';
   @State ocrRecordTime: number = 0;
   @State launchPromptVisible: boolean = false;
+  @State editingBillId: number = 0;
+  @State editingAmountText: string = '';
+  @State editingType: RecordType.EXPENSE | RecordType.INCOME = RecordType.EXPENSE;
+  @State editingCategoryId: number = 0;
+  @State editingAccountId: number = 0;
+  @State editingRemark: string = '';
   private pendingLaunchAction: string = '';
   private pendingLaunchRecordTime: number = 0;
   private launchActionHandled: boolean = false;
@@ -491,15 +497,150 @@ struct AutoBookkeeping {
 
       Row({ space: 10 }) {
         this.ActionButton('确认入账', AppColors.SURFACE, AppColors.CHART_GREEN, () => this.confirm(item))
+        this.ActionButton(this.editingBillId === item.id ? '收起修改' : '修改', AppColors.CHART_BLUE, AppColors.SURFACE_TINT, () => this.toggleEditBill(item))
         this.ActionButton('忽略', AppColors.EXPENSE, '#FCE9E4', () => this.discard(item))
       }
       .width('100%')
+
+      if (this.editingBillId === item.id) {
+        this.PendingEditPanel(item)
+      }
     }
     .width('100%')
     .padding(18)
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private PendingEditPanel(item: AutoBillModel) {
+    Column({ space: 12 }) {
+      Row({ space: 8 }) {
+        this.PendingTypeButton('支出', RecordType.EXPENSE)
+        this.PendingTypeButton('收入', RecordType.INCOME)
+      }
+      .height(42)
+      .padding(4)
+      .backgroundColor(AppColors.SURFACE_SOFT)
+      .borderRadius(AppRadius.PILL)
+
+      TextInput({ text: this.editingAmountText, placeholder: '金额' })
+        .type(InputType.Number)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+        .height(48)
+        .backgroundColor(AppColors.SURFACE_SOFT)
+        .borderRadius(16)
+        .padding({ left: 14, right: 14 })
+        .onChange((value: string) => {
+          this.editingAmountText = this.normalizeAmount(value);
+        })
+
+      this.PendingOptionScroller('分类', this.editingCategories())
+      this.PendingAccountScroller()
+
+      TextInput({ text: this.editingRemark, placeholder: '备注' })
+        .fontSize(14)
+        .fontColor(AppColors.INK)
+        .height(44)
+        .backgroundColor(AppColors.SURFACE_SOFT)
+        .borderRadius(16)
+        .padding({ left: 14, right: 14 })
+        .onChange((value: string) => {
+          this.editingRemark = value;
+        })
+
+      Row({ space: 10 }) {
+        this.ActionButton('保存修改', AppColors.SURFACE, AppColors.CHART_BLUE, () => this.savePendingEdit(item))
+        this.ActionButton('取消', AppColors.MUTED, AppColors.SURFACE_SOFT, () => this.cancelPendingEdit())
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(AppColors.SURFACE_SOFT)
+    .borderRadius(18)
+  }
+
+  @Builder
+  private PendingTypeButton(label: string, type: RecordType.EXPENSE | RecordType.INCOME) {
+    Text(label)
+      .fontSize(13)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(this.editingType === type ? AppColors.SURFACE : AppColors.INK)
+      .height(34)
+      .layoutWeight(1)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(this.editingType === type ? AppColors.CHART_BLUE : '#00000000')
+      .borderRadius(AppRadius.PILL)
+      .onClick(() => {
+        this.editingType = type;
+        this.ensureEditingCategory();
+      })
+  }
+
+  @Builder
+  private PendingOptionScroller(title: string, list: CategoryModel[]) {
+    Column({ space: 8 }) {
+      Text(title)
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+      Scroll() {
+        Row({ space: 8 }) {
+          ForEach(list, (item: CategoryModel) => {
+            Text(item.name)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.editingCategoryId === item.id ? AppColors.SURFACE : AppColors.INK)
+              .height(36)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor(this.editingCategoryId === item.id ? item.color : AppColors.SURFACE)
+              .borderRadius(AppRadius.PILL)
+              .onClick(() => {
+                this.editingCategoryId = item.id || 0;
+              })
+          }, (item: CategoryModel) => `${item.id}`)
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .height(40)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private PendingAccountScroller() {
+    Column({ space: 8 }) {
+      Text('账户')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+      Scroll() {
+        Row({ space: 8 }) {
+          ForEach(this.accounts, (item: AccountModel) => {
+            Text(item.name)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.editingAccountId === item.id ? AppColors.SURFACE : AppColors.INK)
+              .height(36)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor(this.editingAccountId === item.id ? item.color : AppColors.SURFACE)
+              .borderRadius(AppRadius.PILL)
+              .onClick(() => {
+                this.editingAccountId = item.id || 0;
+              })
+          }, (item: AccountModel) => `${item.id}`)
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .height(40)
+    }
+    .width('100%')
   }
 
   @Builder
@@ -1025,11 +1166,82 @@ struct AutoBookkeeping {
     ToastUtil.show('已确认入账');
   }
 
+  private toggleEditBill(item: AutoBillModel): void {
+    if (!item.id) {
+      return;
+    }
+    if (this.editingBillId === item.id) {
+      this.cancelPendingEdit();
+      return;
+    }
+    this.editingBillId = item.id;
+    this.editingAmountText = `${item.amount}`;
+    this.editingType = item.type;
+    this.editingCategoryId = item.categoryId;
+    this.editingAccountId = item.accountId;
+    this.editingRemark = item.remark || '';
+    this.ensureEditingCategory();
+    this.ensureEditingAccount();
+  }
+
+  private cancelPendingEdit(): void {
+    this.editingBillId = 0;
+    this.editingAmountText = '';
+    this.editingType = RecordType.EXPENSE;
+    this.editingCategoryId = 0;
+    this.editingAccountId = 0;
+    this.editingRemark = '';
+  }
+
+  private async savePendingEdit(item: AutoBillModel): Promise<void> {
+    if (!item.id) {
+      return;
+    }
+    const amount = Number(this.editingAmountText);
+    if (!amount || amount <= 0) {
+      ToastUtil.show('请填写正确金额');
+      return;
+    }
+    this.ensureEditingCategory();
+    this.ensureEditingAccount();
+    if (this.editingCategoryId <= 0 || this.editingAccountId <= 0) {
+      ToastUtil.show('请选择分类和账户');
+      return;
+    }
+    const updated: AutoBillModel = {
+      id: item.id,
+      source: item.source,
+      bundleName: item.bundleName,
+      appName: item.appName,
+      title: item.title,
+      content: item.content,
+      rawText: item.rawText,
+      amount: Math.round(amount * 100) / 100,
+      type: this.editingType,
+      categoryId: this.editingCategoryId,
+      accountId: this.editingAccountId,
+      recordTime: item.recordTime,
+      remark: this.editingRemark.trim(),
+      confidence: item.confidence,
+      matchedRule: item.matchedRule,
+      status: item.status,
+      createTime: item.createTime,
+      updateTime: Date.now()
+    };
+    await AutoBookkeepingService.create(getContext(this)).updatePending(updated);
+    this.cancelPendingEdit();
+    await this.loadAll();
+    ToastUtil.show('待确认账单已修改');
+  }
+
   private async discard(item: AutoBillModel): Promise<void> {
     if (!item.id) {
       return;
     }
     await AutoBookkeepingService.create(getContext(this)).discardPending(item.id);
+    if (this.editingBillId === item.id) {
+      this.cancelPendingEdit();
+    }
     await this.loadAll();
     ToastUtil.show('已忽略');
   }
@@ -1136,6 +1348,36 @@ struct AutoBookkeeping {
     }
     const first = this.filteredCategories()[0];
     this.selectedCategoryId = first ? first.id || 0 : 0;
+  }
+
+  private editingCategories(): CategoryModel[] {
+    return this.categories.filter((item: CategoryModel) => item.type === this.editingType);
+  }
+
+  private ensureEditingCategory(): void {
+    const list = this.editingCategories();
+    if (this.editingCategoryId > 0 && list.some((item: CategoryModel) => item.id === this.editingCategoryId)) {
+      return;
+    }
+    const first = list[0];
+    this.editingCategoryId = first ? first.id || 0 : 0;
+  }
+
+  private ensureEditingAccount(): void {
+    if (this.editingAccountId > 0 && this.accounts.some((item: AccountModel) => item.id === this.editingAccountId)) {
+      return;
+    }
+    const first = this.accounts[0];
+    this.editingAccountId = first ? first.id || 0 : 0;
+  }
+
+  private normalizeAmount(value: string): string {
+    const cleaned = value.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return cleaned;
+    }
+    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
   }
 
   private typeMark(type: RecordType.EXPENSE | RecordType.INCOME): string {

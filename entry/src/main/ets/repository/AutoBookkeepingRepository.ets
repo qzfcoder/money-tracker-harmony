@@ -129,6 +129,30 @@ export class AutoBookkeepingRepository {
     return await this.store().insert('t_auto_bill', bucket) as number;
   }
 
+  async updatePending(bill: AutoBillModel): Promise<void> {
+    if (!bill.id || bill.id <= 0) {
+      return;
+    }
+    await this.store().executeSql(
+      `UPDATE t_auto_bill
+       SET amount = ?, type = ?, category_id = ?, account_id = ?, record_time = ?, remark = ?, confidence = ?, matched_rule = ?, update_time = ?
+       WHERE id = ? AND status = ?`,
+      [
+        bill.amount,
+        bill.type,
+        bill.categoryId,
+        bill.accountId,
+        bill.recordTime,
+        bill.remark,
+        bill.confidence,
+        bill.matchedRule,
+        Date.now(),
+        bill.id,
+        AutoBillStatus.PENDING
+      ]
+    );
+  }
+
   async confirmPending(id: number): Promise<void> {
     const bill = await this.findPendingById(id);
     if (!bill) {

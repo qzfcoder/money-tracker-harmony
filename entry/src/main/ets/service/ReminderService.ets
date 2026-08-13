@@ -45,37 +45,84 @@ export class ReminderService {
     }
 
     try {
-      await ReminderService.cancel(previousReminderId);
-      const request: reminderAgentManager.ReminderRequestAlarm = {
-        reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
-        hour: parts[0],
-        minute: parts[1],
-        daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-        title: '记账提醒',
-        content: '今天的收支记录了吗？',
-        expiredContent: '别忘了补记今天的收支',
-        notificationId: ReminderService.NOTIFICATION_ID,
-        slotType: notificationManager.SlotType.SERVICE_INFORMATION,
-        tapDismissed: true,
-        wantAgent: {
-          pkgName: ReminderService.BUNDLE_NAME,
-          abilityName: 'EntryAbility'
-        }
-      };
-      return await reminderAgentManager.publishReminder(request);
+      const request = ReminderService.buildRequest(parts[0], parts[1]);
+      if (previousReminderId > 0 && await ReminderService.update(previousReminderId, request)) {
+        return previousReminderId;
+      }
+      await ReminderService.cancelExistingReminders();
+      return await ReminderService.publishSingle(request);
     } catch (error) {
-      throw new Error(`系统提醒发布失败：${ToastUtil.error(error)}`);
+      try {
+        const request = ReminderService.buildRequest(parts[0], parts[1]);
+        await ReminderService.cancelExistingReminders();
+        return await ReminderService.publishSingle(request);
+      } catch (retryError) {
+        throw new Error(`系统提醒发布失败：${ToastUtil.error(retryError)}`);
+      }
     }
   }
 
   static async cancel(reminderId: number): Promise<void> {
-    if (reminderId <= 0) {
-      return;
+    if (reminderId > 0) {
+      try {
+        await reminderAgentManager.cancelReminder(reminderId);
+      } catch (error) {
+      }
+    }
+    await ReminderService.cancelExistingReminders();
+  }
+
+  static async cancelAll(): Promise<void> {
+    await ReminderService.cancelExistingReminders();
+  }
+
+  private static async update(reminderId: number, request: reminderAgentManager.ReminderRequestAlarm): Promise<boolean> {
+    try {
+      await reminderAgentManager.updateReminder(reminderId, request);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private static async publishSingle(request: reminderAgentManager.ReminderRequestAlarm): Promise<number> {
+    await ReminderService.cancelExistingReminders();
+    return await reminderAgentManager.publishReminder(request);
+  }
+
+  private static async cancelExistingReminders(): Promise<void> {
+    try {
+      const list = await reminderAgentManager.getAllValidReminders();
+      for (const item of list) {
+        try {
+          await reminderAgentManager.cancelReminder(item.reminderId);
+        } catch (error) {
+        }
+      }
+    } catch (error) {
     }
     try {
-      await reminderAgentManager.cancelReminder(reminderId);
+      await reminderAgentManager.cancelAllReminders();
     } catch (error) {
-      // The reminder may already have been removed by the system or an app reinstall.
     }
+  }
+
+  private static buildRequest(hour: number, minute: number): reminderAgentManager.ReminderRequestAlarm {
+    return {
+      reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
+      hour,
+      minute,
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+      title: '记账提醒',
+      content: '今天的收支记录了吗？',
+      expiredContent: '别忘了补记今天的收支',
+      notificationId: ReminderService.NOTIFICATION_ID,
+      slotType: notificationManager.SlotType.SERVICE_INFORMATION,
+      tapDismissed: true,
+      wantAgent: {
+        pkgName: ReminderService.BUNDLE_NAME,
+        abilityName: 'EntryAbility'
+      }
+    };
   }
 }

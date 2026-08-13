@@ -61,6 +61,7 @@ struct Index {
 
   onPageShow(): void {
     if (this.privacyAccepted) {
+      this.statisticsRefreshKey++;
       this.refresh();
     }
   }
@@ -1286,6 +1287,9 @@ struct Index {
     } catch (error) {
     }
     await this.refreshHomeMetrics();
+    if (this.currentTab === 1) {
+      this.statisticsRefreshKey++;
+    }
   }
 
   private async loadProfileSettings(): Promise<void> {

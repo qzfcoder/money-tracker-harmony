@@ -4,7 +4,7 @@ import { NumberUtil } from '../utils/NumberUtil';
 
 @Component
 export struct BarChart {
-  @Prop points: TrendPoint[] = [];
+  @Prop @Watch('onPointsChanged') points: TrendPoint[] = [];
   @State viewportWidth: number = 0;
   private readonly chartHeight: number = 196;
   private readonly plotTop: number = 10;
@@ -174,6 +174,12 @@ export struct BarChart {
     });
   }
 
+  private onPointsChanged(): void {
+    setTimeout(() => {
+      this.drawChart();
+    }, 0);
+  }
+
   private drawGrid(left: number, top: number, plotWidth: number, plotHeight: number): void {
     this.context.strokeStyle = '#D9E7F2';
     this.context.lineWidth = 0.6;
@@ -265,7 +271,15 @@ export struct BarChart {
   private canvasKey(): string {
     const first = this.points.length > 0 ? this.points[0].label : 'empty';
     const last = this.points.length > 0 ? this.points[this.points.length - 1].label : 'empty';
-    return `bar-chart-${first}-${last}-${this.points.length}-${this.maxValue()}`;
+    return `bar-chart-${first}-${last}-${this.points.length}-${this.maxValue()}-${this.totalValue()}`;
+  }
+
+  private totalValue(): number {
+    let total = 0;
+    this.points.forEach((point: TrendPoint) => {
+      total += point.income + point.expense;
+    });
+    return Math.round(total * 100);
   }
 
   private shortLabel(label: string): string {

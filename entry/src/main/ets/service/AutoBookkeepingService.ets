@@ -132,6 +132,10 @@ export class AutoBookkeepingService {
     await this.autoRepository.confirmPending(id);
   }
 
+  async updatePending(bill: AutoBillModel): Promise<void> {
+    await this.autoRepository.updatePending(bill);
+  }
+
   async discardPending(id: number): Promise<void> {
     await this.autoRepository.discardPending(id);
   }
@@ -462,7 +466,9 @@ export class AutoBookkeepingService {
   }
 
   private normalizeText(text: string): string {
-    return `${text || ''}`.toLowerCase().replace(/\s+/g, '').replace(/[：:]/g, '').replace(/[，。！？、,.;；]/g, '，');
+    let value = `${text || ''}`.toLowerCase().replace(/\s+/g, '').replace(/[：:]/g, '');
+    value = value.replace(/([0-9])[，,。．·•](?=[0-9]{1,2}(?:元|块|人民币|¥|￥|，|；|;|$))/g, '$1.');
+    return value.replace(/[，。！？、,;；]/g, '，');
   }
 
   private async loadSettings(): Promise<AutoBookkeepingSettings> {

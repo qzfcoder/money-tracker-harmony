@@ -190,9 +190,18 @@ struct Settings {
           .backgroundColor(this.reminderEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
           .borderRadius(AppRadius.PILL)
           .onClick(() => this.toggleReminder())
+        Button('清理')
+          .height(46)
+          .width(76)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.EXPENSE)
+          .backgroundColor('#FCE9E4')
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.clearReminder())
         Button(this.reminderTime)
           .height(46)
-          .width(130)
+          .width(104)
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.INK)
@@ -479,12 +488,13 @@ struct Settings {
             this.reminderAgentId
           );
         } else {
-          await ReminderService.cancel(this.reminderAgentId);
+          await ReminderService.cancelAll();
           this.reminderAgentId = -1;
         }
       } catch (error) {
         this.reminderEnabled = false;
         this.reminderAgentId = -1;
+        await this.persistSettingsSilently(normalizedTime);
         ToastUtil.show(ToastUtil.error(error, '提醒开启失败'));
         return;
       }
@@ -521,6 +531,18 @@ struct Settings {
     }
     this.reminderEnabled = !this.reminderEnabled;
     await this.saveSettings(true);
+  }
+
+  private async clearReminder(): Promise<void> {
+    try {
+      await ReminderService.cancelAll();
+      this.reminderEnabled = false;
+      this.reminderAgentId = -1;
+      await this.persistSettingsSilently(this.reminderTime.trim() || '20:00');
+      ToastUtil.show('已清理系统提醒');
+    } catch (error) {
+      ToastUtil.show(ToastUtil.error(error, '提醒清理失败'));
+    }
   }
 
   private scheduleReminderTimeSave(): void {
@@ -579,7 +601,7 @@ struct Settings {
 
   private async resetSettings(): Promise<void> {
     try {
-      await ReminderService.cancel(this.reminderAgentId);
+      await ReminderService.cancelAll();
       await this.repository.reset(getContext(this));
       await this.loadSettings();
       ThemeUtil.apply(this.themeMode, getContext(this));
@@ -597,5 +619,23 @@ struct Settings {
       return '深色';
     }
     return '跟随系统';
+  }
+
+  private async persistSettingsSilently(normalizedTime: string): Promise<void> {
+    const settings: AppSettingsData = {
+      themeMode: this.themeMode,
+      currencySymbol: this.currencySymbol.trim() || '¥',
+      reminderEnabled: this.reminderEnabled,
+      reminderTime: normalizedTime,
+      reminderAgentId: this.reminderAgentId,
+      autoBookkeepingEnabled: this.autoBookkeepingEnabled,
+      autoReviewEnabled: this.autoReviewEnabled,
+      autoNotificationEnabled: this.autoNotificationEnabled,
+      autoSmsEnabled: this.autoSmsEnabled,
+      autoDefaultAccountId: this.autoDefaultAccountId,
+      autoNotificationPromptShown: this.autoNotificationPromptShown,
+      alipayBillImportEnabled: this.alipayBillImportEnabled
+    };
+    await this.repository.save(getContext(this), settings);
   }
 }
