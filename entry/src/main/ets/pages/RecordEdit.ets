@@ -363,7 +363,7 @@ struct RecordEdit {
       this.vm.amountText = this.amountText;
       const savedRecord = await this.vm.save();
       this.applySavedRecord(savedRecord);
-      this.refreshAppState();
+      await this.refreshAppState();
       ToastUtil.show(this.vm.recordId > 0 ? '账单已更新' : '已保存');
       router.back();
     } catch (error) {

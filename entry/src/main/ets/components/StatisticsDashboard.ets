@@ -10,6 +10,7 @@ import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
 import { StatisticsPdfExporter, StatisticsPdfReport } from '../utils/StatisticsPdfExporter';
 import { ToastUtil } from '../utils/ToastUtil';
+import { AppDatabase } from '../database/AppDatabase';
 
 interface DatePickerResult {
   year?: number;
@@ -25,6 +26,7 @@ enum TrendChartMode {
 @Component
 export struct StatisticsDashboard {
   @Prop showHeader: boolean = true;
+  @Prop @Watch('onActiveChanged') active: boolean = true;
   @Prop @Watch('onRefreshKeyChanged') refreshKey: number = 0;
   @State vm: StatisticsViewModel = new StatisticsViewModel();
   @State viewportWidth: number = 0;
@@ -45,6 +47,12 @@ export struct StatisticsDashboard {
 
   onRefreshKeyChanged(): void {
     this.refreshData();
+  }
+
+  onActiveChanged(): void {
+    if (this.active) {
+      this.refreshData();
+    }
   }
 
   build() {
@@ -490,9 +498,19 @@ export struct StatisticsDashboard {
       .borderRadius(AppRadius.PILL)
 
       if (this.chartMode === TrendChartMode.LINE) {
-        LineChart({ points: this.trendPoints })
+        LineChart({
+          points: this.trendPoints,
+          totalIncome: this.income,
+          totalExpense: this.expense,
+          refreshKey: this.refreshKey
+        })
       } else {
-        BarChart({ points: this.trendPoints })
+        BarChart({
+          points: this.trendPoints,
+          totalIncome: this.income,
+          totalExpense: this.expense,
+          refreshKey: this.refreshKey
+        })
       }
     }
     .width(this.chartCardWidth())
@@ -792,6 +810,7 @@ export struct StatisticsDashboard {
 
   private async refreshData(): Promise<void> {
     try {
+      await AppDatabase.getInstance().init(getContext(this));
       await this.vm.refresh();
       this.income = this.vm.income;
       this.expense = this.vm.expense;

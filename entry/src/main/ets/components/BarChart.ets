@@ -5,6 +5,9 @@ import { NumberUtil } from '../utils/NumberUtil';
 @Component
 export struct BarChart {
   @Prop @Watch('onPointsChanged') points: TrendPoint[] = [];
+  @Prop @Watch('onTotalsChanged') totalIncome: number = 0;
+  @Prop @Watch('onTotalsChanged') totalExpense: number = 0;
+  @Prop @Watch('onRefreshKeyChanged') refreshKey: number = 0;
   @State viewportWidth: number = 0;
   private readonly chartHeight: number = 196;
   private readonly plotTop: number = 10;
@@ -69,17 +72,33 @@ export struct BarChart {
   @Builder
   private ChartSummary() {
     Row() {
-      Column({ space: 2 }) {
-        Text('区间峰值')
-          .fontSize(11)
-          .fontColor(AppColors.MUTED)
-        Text(NumberUtil.money(this.maxValue()))
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.INK)
-          .maxLines(1)
+      Row({ space: 14 }) {
+        Column({ space: 2 }) {
+          Text('本期收入')
+            .fontSize(11)
+            .fontColor(AppColors.MUTED)
+          Text(NumberUtil.money(this.totalIncome))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.CHART_GREEN)
+            .maxLines(1)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
+        Column({ space: 2 }) {
+          Text('本期支出')
+            .fontSize(11)
+            .fontColor(AppColors.MUTED)
+          Text(NumberUtil.money(this.totalExpense))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.CHART_PINK)
+            .maxLines(1)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
       }
-      .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
       Text(this.points.length === 0 ? '无数据' : `${this.points.length} 组`)
@@ -180,6 +199,18 @@ export struct BarChart {
     }, 0);
   }
 
+  private onRefreshKeyChanged(): void {
+    setTimeout(() => {
+      this.drawChart();
+    }, 0);
+  }
+
+  private onTotalsChanged(): void {
+    setTimeout(() => {
+      this.drawChart();
+    }, 0);
+  }
+
   private drawGrid(left: number, top: number, plotWidth: number, plotHeight: number): void {
     this.context.strokeStyle = '#D9E7F2';
     this.context.lineWidth = 0.6;
@@ -271,7 +302,7 @@ export struct BarChart {
   private canvasKey(): string {
     const first = this.points.length > 0 ? this.points[0].label : 'empty';
     const last = this.points.length > 0 ? this.points[this.points.length - 1].label : 'empty';
-    return `bar-chart-${first}-${last}-${this.points.length}-${this.maxValue()}-${this.totalValue()}`;
+    return `bar-chart-${first}-${last}-${this.points.length}-${this.maxValue()}-${this.totalValue()}-${this.totalIncome}-${this.totalExpense}-${this.refreshKey}`;
   }
 
   private totalValue(): number {

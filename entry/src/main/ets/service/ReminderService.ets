@@ -46,9 +46,6 @@ export class ReminderService {
 
     try {
       const request = ReminderService.buildRequest(parts[0], parts[1]);
-      if (previousReminderId > 0 && await ReminderService.update(previousReminderId, request)) {
-        return previousReminderId;
-      }
       await ReminderService.cancelExistingReminders();
       return await ReminderService.publishSingle(request);
     } catch (error) {
@@ -76,17 +73,7 @@ export class ReminderService {
     await ReminderService.cancelExistingReminders();
   }
 
-  private static async update(reminderId: number, request: reminderAgentManager.ReminderRequestAlarm): Promise<boolean> {
-    try {
-      await reminderAgentManager.updateReminder(reminderId, request);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   private static async publishSingle(request: reminderAgentManager.ReminderRequestAlarm): Promise<number> {
-    await ReminderService.cancelExistingReminders();
     return await reminderAgentManager.publishReminder(request);
   }
 

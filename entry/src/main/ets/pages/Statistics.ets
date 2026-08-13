@@ -43,7 +43,7 @@ struct Statistics {
       .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
       .alignSelf(ItemAlign.Center)
 
-      StatisticsDashboard({ showHeader: false, refreshKey: this.refreshKey })
+      StatisticsDashboard({ showHeader: false, active: true, refreshKey: this.refreshKey })
         .layoutWeight(1)
         .width('100%')
     }

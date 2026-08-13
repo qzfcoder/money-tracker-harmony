@@ -18,11 +18,14 @@ build-profile.json5
 *.jpg
 *.png
 *.json
+hs_err_pid*.log
 test-artifacts/
 
 # Keep source assets even though generic image/json dumps are ignored above
 !release-assets/
 !release-assets/**
+!release-screenshots/
+!release-screenshots/**
 !AppScope/resources/**
 !entry/src/main/resources/**
 !entry/src/main/resources/**/*.json

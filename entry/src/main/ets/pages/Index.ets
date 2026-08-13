@@ -837,7 +837,7 @@ struct Index {
   @Builder
   private StatisticsTab() {
     Column() {
-      StatisticsDashboard({ refreshKey: this.statisticsRefreshKey })
+      StatisticsDashboard({ active: this.currentTab === 1, refreshKey: this.statisticsRefreshKey })
         .layoutWeight(1)
     }
     .width('100%')
