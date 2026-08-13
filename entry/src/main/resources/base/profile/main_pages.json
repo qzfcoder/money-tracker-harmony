@@ -1,0 +1,22 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/Statistics",
+    "pages/Assets",
+    "pages/Profile",
+    "pages/RecordEdit",
+    "pages/RecordDetail",
+    "pages/CategoryPicker",
+    "pages/AccountPicker",
+    "pages/CategoryManage",
+    "pages/AccountManage",
+    "pages/BudgetSetting",
+    "pages/Search",
+    "pages/Calendar",
+    "pages/DataExport",
+    "pages/AlipayImport",
+    "pages/AutoBookkeeping",
+    "pages/Settings",
+    "pages/About"
+  ]
+}

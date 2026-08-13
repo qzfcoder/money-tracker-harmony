@@ -1,0 +1,601 @@
+import { router } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { AppColors, AppRadius, AppSpace, LayoutSizes } from '../constants/DesignSystem';
+import { FeatureFlags } from '../constants/FeatureFlags';
+import { ROUTES } from '../constants/RouteConstants';
+import { AppSettingsData, SettingsRepository, ThemeMode } from '../repository/SettingsRepository';
+import { ReminderService } from '../service/ReminderService';
+import { ThemeUtil } from '../utils/ThemeUtil';
+import { ToastUtil } from '../utils/ToastUtil';
+
+@Entry
+@Component
+struct Settings {
+  private repository: SettingsRepository = new SettingsRepository();
+
+  @State userName: string = '账本';
+  @State themeMode: ThemeMode = ThemeMode.SYSTEM;
+  @State currencySymbol: string = '¥';
+  @State reminderEnabled: boolean = false;
+  @State reminderTime: string = '20:00';
+  @State reminderAgentId: number = -1;
+  @State autoBookkeepingEnabled: boolean = false;
+  @State autoReviewEnabled: boolean = true;
+  @State autoNotificationEnabled: boolean = true;
+  @State autoSmsEnabled: boolean = false;
+  @State autoDefaultAccountId: number = 0;
+  @State autoNotificationPromptShown: boolean = false;
+  @State alipayBillImportEnabled: boolean = false;
+  private reminderSaveTimer: number = -1;
+
+  aboutToAppear(): void {
+    this.loadSettings();
+  }
+
+  aboutToDisappear(): void {
+    if (this.reminderSaveTimer >= 0) {
+      clearTimeout(this.reminderSaveTimer);
+      this.reminderSaveTimer = -1;
+    }
+  }
+
+  build() {
+    Column() {
+      this.Header()
+
+      Scroll() {
+        Column({ space: 18 }) {
+          this.ProfileCard()
+          this.ThemeCard()
+          this.CurrencyCard()
+          this.ReminderCard()
+          if (FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
+            this.AlipayImportCard()
+          }
+          if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+            this.AutoBookkeepingCard()
+          }
+          this.DataCard()
+          this.SaveBar()
+        }
+        .width('100%')
+        .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
+        .alignSelf(ItemAlign.Center)
+        .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 10, bottom: 24 })
+      }
+      .layoutWeight(1)
+      .backgroundColor(AppColors.CANVAS)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(AppColors.CANVAS)
+  }
+
+  @Builder
+  private ProfileCard() {
+    Column({ space: 12 }) {
+      this.CardTitle('称呼', this.userName.trim() || '未设置')
+      TextInput({ text: this.userName, placeholder: '输入你的名字或昵称' })
+        .height(50)
+        .fontSize(17)
+        .fontWeight(FontWeight.Medium)
+        .backgroundColor(AppColors.SURFACE_SOFT)
+        .borderRadius(16)
+        .padding({ left: 16, right: 16 })
+        .onChange((value: string) => {
+          this.userName = value;
+        })
+      Text('只保存在本机，用于首页问候和头像显示。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private Header() {
+    Column({ space: 6 }) {
+      Button('‹')
+        .fontSize(24)
+        .fontColor(AppColors.CHART_BLUE)
+        .width(46)
+        .height(46)
+        .backgroundColor(AppColors.SURFACE)
+        .borderRadius(23)
+        .shadow({ radius: 14, color: AppColors.SHADOW, offsetY: 6 })
+        .alignSelf(ItemAlign.Start)
+        .onClick(() => router.back())
+      Column({ space: 4 }) {
+        Text('设置')
+          .fontSize(24)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+          .width('100%')
+        Text('主题、货币和提醒')
+          .fontSize(13)
+          .fontColor(AppColors.MUTED)
+          .width('100%')
+      }
+      .alignItems(HorizontalAlign.Start)
+      .width('100%')
+    }
+    .width('100%')
+    .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 22, bottom: 8 })
+  }
+
+  @Builder
+  private ThemeCard() {
+    Column({ space: 14 }) {
+      this.CardTitle('外观', this.themeLabel())
+      Row({ space: 8 }) {
+        this.ThemeButton('跟随系统', ThemeMode.SYSTEM)
+        this.ThemeButton('浅色', ThemeMode.LIGHT)
+        this.ThemeButton('深色', ThemeMode.DARK)
+      }
+      .width('100%')
+      Text('已保存主题偏好，后续页面配色会按该偏好扩展。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private CurrencyCard() {
+    Column({ space: 14 }) {
+      this.CardTitle('货币', this.currencySymbol || '¥')
+      TextInput({ text: this.currencySymbol, placeholder: '¥' })
+        .height(50)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .backgroundColor(AppColors.SURFACE_SOFT)
+        .borderRadius(16)
+        .padding({ left: 16, right: 16 })
+        .onChange((value: string) => {
+          this.currencySymbol = value;
+        })
+      Text('例如 ¥、$、€，会保存在偏好设置中。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private ReminderCard() {
+    Column({ space: 14 }) {
+      this.CardTitle('记账提醒', this.reminderEnabled ? '已开启' : '未开启')
+      Row({ space: 10 }) {
+        Button(this.reminderEnabled ? '关闭提醒' : '开启提醒')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.reminderEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
+          .height(46)
+          .layoutWeight(1)
+          .backgroundColor(this.reminderEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.toggleReminder())
+        Button(this.reminderTime)
+          .height(46)
+          .width(130)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+          .backgroundColor(AppColors.SURFACE_SOFT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.showReminderTimePicker())
+      }
+      .width('100%')
+      Text('开启后会在每天设定时间发送系统提醒；修改时间会自动更新提醒。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private AlipayImportCard() {
+    Column({ space: 14 }) {
+      this.CardTitle('支付宝账单导入', this.alipayBillImportEnabled ? '已开启' : '未开启')
+      Row({ space: 10 }) {
+        Button(this.alipayBillImportEnabled ? '关闭导入' : '开启导入')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.alipayBillImportEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
+          .height(46)
+          .layoutWeight(1)
+          .backgroundColor(this.alipayBillImportEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => {
+            this.toggleAlipayImportSetting();
+          })
+        Button('导入账单')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.SURFACE)
+          .height(46)
+          .layoutWeight(1)
+          .opacity(this.alipayBillImportEnabled ? 1 : 0.45)
+          .backgroundColor(AppColors.CHART_BLUE)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => {
+            if (this.alipayBillImportEnabled) {
+              router.pushUrl({ url: ROUTES.ALIPAY_IMPORT });
+            } else {
+              ToastUtil.show('请先开启账单导入');
+            }
+          })
+      }
+      .width('100%')
+      Text('支持导入支付宝导出的 CSV 文件。账单会先进入待确认列表，审核后才会写入正式流水。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(20)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private AutoBookkeepingCard() {
+    Column({ space: 14 }) {
+      this.CardTitle('主动识别记账', this.autoBookkeepingEnabled ? '已开启' : '未开启')
+      Row({ space: 10 }) {
+        Button(this.autoBookkeepingEnabled ? '关闭辅助' : '开启辅助')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.autoBookkeepingEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
+          .height(46)
+          .layoutWeight(1)
+          .backgroundColor(this.autoBookkeepingEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => {
+            this.toggleAutoBookkeepingSetting();
+          })
+        Button('去识别')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.SURFACE)
+          .height(46)
+          .layoutWeight(1)
+          .backgroundColor(AppColors.CHART_BLUE)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => router.pushUrl({ url: ROUTES.AUTO_BOOKKEEPING }))
+      }
+      .width('100%')
+      if (FeatureFlags.NOTIFICATION_AUTO_CAPTURE_VISIBLE) {
+        Row({ space: 10 }) {
+          this.AutoChip('先确认', this.autoReviewEnabled, () => {
+            this.toggleAutoReviewSetting();
+          })
+          this.AutoChip('通知', this.autoNotificationEnabled, () => {
+            this.toggleAutoNotificationSetting();
+          })
+          this.AutoChip('短信', this.autoSmsEnabled, () => {
+            this.toggleAutoSmsSetting();
+          })
+        }
+        .width('100%')
+      }
+      Text('打开账单详情后手动截图，回到应用选择截图识别。本机 OCR 识别后会先进入待确认账单。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(20)
+        .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private AutoChip(label: string, enabled: boolean, onClick: () => void) {
+    Text(label)
+      .fontSize(13)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(enabled ? AppColors.SURFACE : AppColors.MUTED)
+      .height(38)
+      .layoutWeight(1)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(enabled ? AppColors.CHART_BLUE : AppColors.SURFACE_SOFT)
+      .borderRadius(AppRadius.PILL)
+      .onClick(onClick)
+  }
+
+  @Builder
+  private DataCard() {
+    Column({ space: 12 }) {
+      this.CardTitle('数据与管理', '快捷入口')
+      this.RouteRow('收支日历', '按日期查看每日收支', ROUTES.CALENDAR)
+      this.RouteRow('分类管理', '调整常用分类和排序', ROUTES.CATEGORY_MANAGE)
+      this.RouteRow('账户管理', '新增、编辑账户余额', ROUTES.ACCOUNT_MANAGE)
+      this.RouteRow('预算管理', '设置月度预算', ROUTES.BUDGET_SETTING)
+      if (FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
+        this.RouteRow('支付宝账单导入', '导入 CSV 并审核后入账', ROUTES.ALIPAY_IMPORT)
+      }
+      if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+        this.RouteRow('主动识别记账', '截图 OCR 和待确认账单', ROUTES.AUTO_BOOKKEEPING)
+      }
+      this.RouteRow('数据导出', '导出 CSV 和备份文件', ROUTES.DATA_EXPORT)
+      this.RouteRow('关于', '版本和说明', ROUTES.ABOUT)
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private SaveBar() {
+    Row({ space: 10 }) {
+      Button('保存设置')
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.SURFACE)
+        .height(50)
+        .layoutWeight(1)
+        .backgroundColor(AppColors.CHART_BLUE)
+        .borderRadius(AppRadius.PILL)
+        .onClick(() => this.saveSettings())
+      Button('恢复默认')
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.EXPENSE)
+        .height(50)
+        .layoutWeight(1)
+        .backgroundColor('#FCE9E4')
+        .borderRadius(AppRadius.PILL)
+        .onClick(() => this.resetSettings())
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private CardTitle(title: string, badge: string) {
+    Row() {
+      Text(title)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+      Blank()
+      Text(badge)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppColors.LEDGER)
+        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+        .backgroundColor(AppColors.SURFACE_TINT)
+        .borderRadius(AppRadius.PILL)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private ThemeButton(label: string, mode: ThemeMode) {
+    Text(label)
+      .fontSize(14)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(this.themeMode === mode ? AppColors.INK : AppColors.MUTED)
+      .height(42)
+      .layoutWeight(1)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(this.themeMode === mode ? AppColors.SURFACE_TINT : AppColors.SURFACE_SOFT)
+      .borderRadius(AppRadius.PILL)
+      .onClick(() => {
+        this.themeMode = mode;
+        ThemeUtil.apply(mode, getContext(this));
+        this.saveSettings(false);
+      })
+  }
+
+  @Builder
+  private RouteRow(title: string, subtitle: string, url: string) {
+    Row({ space: 12 }) {
+      Column({ space: 4 }) {
+        Text(title)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+          .width('100%')
+        Text(subtitle)
+          .fontSize(12)
+          .fontColor(AppColors.MUTED)
+          .width('100%')
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Text('›')
+        .fontSize(24)
+        .fontColor(AppColors.FAINT)
+    }
+    .height(62)
+    .width('100%')
+    .padding({ left: 14, right: 14 })
+    .backgroundColor(AppColors.SURFACE_SOFT)
+    .borderRadius(18)
+    .onClick(() => router.pushUrl({ url }))
+  }
+
+  private async loadSettings(): Promise<void> {
+    try {
+      this.userName = await this.repository.loadUserName(getContext(this));
+      const settings = await this.repository.load(getContext(this));
+      this.themeMode = settings.themeMode;
+      ThemeUtil.apply(this.themeMode, getContext(this));
+      this.currencySymbol = settings.currencySymbol;
+      this.reminderEnabled = settings.reminderEnabled;
+      this.reminderTime = settings.reminderTime;
+      this.reminderAgentId = settings.reminderAgentId;
+      this.autoBookkeepingEnabled = settings.autoBookkeepingEnabled;
+      this.autoReviewEnabled = settings.autoReviewEnabled;
+      this.autoNotificationEnabled = settings.autoNotificationEnabled;
+      this.autoSmsEnabled = settings.autoSmsEnabled;
+      this.autoDefaultAccountId = settings.autoDefaultAccountId;
+      this.autoNotificationPromptShown = settings.autoNotificationPromptShown;
+      this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
+    } catch (error) {
+      ToastUtil.show(ToastUtil.error(error, '设置加载失败'));
+    }
+  }
+
+  private async saveSettings(updateReminder: boolean = true): Promise<void> {
+    const normalizedTime = this.reminderTime.trim() || '20:00';
+    if (this.reminderEnabled && !ReminderService.parseTime(normalizedTime)) {
+      ToastUtil.show('提醒时间格式应为 HH:mm');
+      return;
+    }
+    if (updateReminder) {
+      try {
+        if (this.reminderEnabled) {
+          this.reminderAgentId = await ReminderService.schedule(
+            getContext(this) as common.UIAbilityContext,
+            normalizedTime,
+            this.reminderAgentId
+          );
+        } else {
+          await ReminderService.cancel(this.reminderAgentId);
+          this.reminderAgentId = -1;
+        }
+      } catch (error) {
+        this.reminderEnabled = false;
+        this.reminderAgentId = -1;
+        ToastUtil.show(ToastUtil.error(error, '提醒开启失败'));
+        return;
+      }
+    }
+    const settings: AppSettingsData = {
+      themeMode: this.themeMode,
+      currencySymbol: this.currencySymbol.trim() || '¥',
+      reminderEnabled: this.reminderEnabled,
+      reminderTime: normalizedTime,
+      reminderAgentId: this.reminderAgentId,
+      autoBookkeepingEnabled: this.autoBookkeepingEnabled,
+      autoReviewEnabled: this.autoReviewEnabled,
+      autoNotificationEnabled: this.autoNotificationEnabled,
+      autoSmsEnabled: this.autoSmsEnabled,
+      autoDefaultAccountId: this.autoDefaultAccountId,
+      autoNotificationPromptShown: this.autoNotificationPromptShown,
+      alipayBillImportEnabled: this.alipayBillImportEnabled
+    };
+    try {
+      await this.repository.saveUserName(getContext(this), this.userName);
+      this.userName = this.userName.trim() || '账本';
+      this.reminderTime = normalizedTime;
+      await this.repository.save(getContext(this), settings);
+      ToastUtil.show(updateReminder && this.reminderEnabled ? `提醒已设置为 ${normalizedTime}` : '设置已保存');
+    } catch (error) {
+      ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
+    }
+  }
+
+  private async toggleReminder(): Promise<void> {
+    if (this.reminderSaveTimer >= 0) {
+      clearTimeout(this.reminderSaveTimer);
+      this.reminderSaveTimer = -1;
+    }
+    this.reminderEnabled = !this.reminderEnabled;
+    await this.saveSettings(true);
+  }
+
+  private scheduleReminderTimeSave(): void {
+    if (!this.reminderEnabled) {
+      return;
+    }
+    if (this.reminderSaveTimer >= 0) {
+      clearTimeout(this.reminderSaveTimer);
+    }
+    this.reminderSaveTimer = setTimeout(() => {
+      this.reminderSaveTimer = -1;
+      this.saveSettings(true);
+    }, 800);
+  }
+
+  private showReminderTimePicker(): void {
+    const parts = ReminderService.parseTime(this.reminderTime) || [20, 0];
+    const selected = new Date();
+    selected.setHours(parts[0], parts[1], 0, 0);
+    TimePickerDialog.show({
+      selected,
+      useMilitaryTime: true,
+      onAccept: (value: TimePickerResult) => {
+        const hour = `${value.hour}`.padStart(2, '0');
+        const minute = `${value.minute}`.padStart(2, '0');
+        this.reminderTime = `${hour}:${minute}`;
+        this.scheduleReminderTimeSave();
+      }
+    });
+  }
+
+  private async toggleAlipayImportSetting(): Promise<void> {
+    this.alipayBillImportEnabled = !this.alipayBillImportEnabled;
+    await this.saveSettings(false);
+  }
+
+  private async toggleAutoBookkeepingSetting(): Promise<void> {
+    this.autoBookkeepingEnabled = !this.autoBookkeepingEnabled;
+    await this.saveSettings(false);
+  }
+
+  private async toggleAutoReviewSetting(): Promise<void> {
+    this.autoReviewEnabled = !this.autoReviewEnabled;
+    await this.saveSettings(false);
+  }
+
+  private async toggleAutoNotificationSetting(): Promise<void> {
+    this.autoNotificationEnabled = !this.autoNotificationEnabled;
+    await this.saveSettings(false);
+  }
+
+  private async toggleAutoSmsSetting(): Promise<void> {
+    this.autoSmsEnabled = !this.autoSmsEnabled;
+    await this.saveSettings(false);
+  }
+
+  private async resetSettings(): Promise<void> {
+    try {
+      await ReminderService.cancel(this.reminderAgentId);
+      await this.repository.reset(getContext(this));
+      await this.loadSettings();
+      ThemeUtil.apply(this.themeMode, getContext(this));
+      ToastUtil.show('已恢复默认设置');
+    } catch (error) {
+      ToastUtil.show(ToastUtil.error(error, '恢复默认失败'));
+    }
+  }
+
+  private themeLabel(): string {
+    if (this.themeMode === ThemeMode.LIGHT) {
+      return '浅色';
+    }
+    if (this.themeMode === ThemeMode.DARK) {
+      return '深色';
+    }
+    return '跟随系统';
+  }
+}

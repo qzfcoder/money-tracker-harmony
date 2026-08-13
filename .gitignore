@@ -1,0 +1,30 @@
+# HarmonyOS / DevEco generated files
+.hvigor/
+build/
+entry/build/
+.idea/
+
+# Local machine configuration and signing credentials
+local.properties
+build-profile.json5
+*.p12
+*.p7b
+*.cer
+*.keystore
+*.jks
+
+# Temporary screenshots and UI dumps produced during manual testing
+*.jpeg
+*.jpg
+*.png
+*.json
+test-artifacts/
+
+# Keep source assets even though generic image/json dumps are ignored above
+!release-assets/
+!release-assets/**
+!AppScope/resources/**
+!entry/src/main/resources/**
+!entry/src/main/resources/**/*.json
+!entry/src/main/resources/**/*.png
+!entry/src/main/resources/**/*.svg
