@@ -113,12 +113,49 @@ struct Assets {
           .width('100%')
       }
       .alignItems(HorizontalAlign.Start)
+
+      Row({ space: 10 }) {
+        this.AssetMetric('资产', NumberUtil.compactMoney(this.vm.assetBalance), AppColors.CHART_GREEN, AppColors.softGreen())
+        this.AssetMetric('负债', NumberUtil.compactMoney(this.vm.liabilityBalance), AppColors.EXPENSE, AppColors.softDanger())
+        this.AssetMetric('账户', `${this.vm.assetAccountCount}/${this.vm.liabilityAccountCount}`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+      }
+      .width('100%')
+
+      Text(this.assetInsight())
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(19)
+        .width('100%')
     }
     .width('100%')
     .padding(18)
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 24, color: AppColors.SHADOW, offsetY: 10 })
+  }
+
+  @Builder
+  private AssetMetric(label: string, value: string, color: string, bgColor: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .maxLines(1)
+      Text(value)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .textAlign(TextAlign.Center)
+    }
+    .layoutWeight(1)
+    .height(64)
+    .justifyContent(FlexAlign.Center)
+    .padding(10)
+    .backgroundColor(bgColor)
+    .borderRadius(16)
   }
 
   @Builder
@@ -199,5 +236,25 @@ struct Assets {
 
   private contentMaxWidth(): number {
     return this.viewportWidth >= Breakpoints.DESKTOP ? LayoutSizes.CONTENT_MAX : LayoutSizes.CONTENT_COMPACT;
+  }
+
+  private assetInsight(): string {
+    if (this.vm.accounts.length === 0) {
+      return '还没有账户，先添加常用钱包或银行卡。';
+    }
+    if (this.vm.assetBalance <= 0 && this.vm.liabilityBalance <= 0) {
+      return '账户余额还没有录入，维护余额后可查看净资产。';
+    }
+    if (this.vm.assetBalance <= 0) {
+      return '当前主要是负债账户，建议补充资产账户余额。';
+    }
+    const ratio = Math.round(this.vm.liabilityBalance / this.vm.assetBalance * 100);
+    if (ratio <= 0) {
+      return '当前没有负债账户，资产结构比较清爽。';
+    }
+    if (ratio >= 80) {
+      return `负债约为资产的 ${ratio}%，建议优先关注还款安排。`;
+    }
+    return `负债约为资产的 ${ratio}%，可结合账户列表定期检查余额。`;
   }
 }
