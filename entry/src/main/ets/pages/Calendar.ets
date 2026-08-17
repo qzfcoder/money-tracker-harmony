@@ -32,6 +32,9 @@ struct CalendarPage {
   @State monthBalance: number = 0;
   @State selectedIncome: number = 0;
   @State selectedExpense: number = 0;
+  @State activeDayCount: number = 0;
+  @State topExpenseDayKey: string = '';
+  @State topExpenseDayAmount: number = 0;
 
   aboutToAppear(): void {
     this.loadMonth();
@@ -148,10 +151,22 @@ struct CalendarPage {
 
   @Builder
   private MonthOverview() {
-    Row({ space: 8 }) {
-      this.SummaryMetric('收入', () => this.monthIncome, AppColors.INCOME, '#E6F7EF')
-      this.SummaryMetric('支出', () => this.monthExpense, AppColors.EXPENSE, '#FFEAF0')
-      this.SummaryMetric('结余', () => this.monthBalance, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        this.SummaryMetric('收入', () => this.monthIncome, AppColors.INCOME, '#E6F7EF')
+        this.SummaryMetric('支出', () => this.monthExpense, AppColors.EXPENSE, '#FFEAF0')
+        this.SummaryMetric('结余', () => this.monthBalance, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+      }
+      .width('100%')
+
+      Text(this.monthInsight())
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(19)
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+        .backgroundColor(AppColors.SURFACE)
+        .borderRadius(16)
     }
     .width('100%')
   }
@@ -396,9 +411,24 @@ struct CalendarPage {
       }
     });
     this.dailyCashflow = Array.from(cashflowMap.values());
+    this.activeDayCount = this.dailyCashflow.length;
+    this.refreshMonthInsight();
     this.monthIncome = income;
     this.monthExpense = expense;
     this.monthBalance = income - expense;
+  }
+
+  private refreshMonthInsight(): void {
+    let topDay = '';
+    let topAmount = 0;
+    this.dailyCashflow.forEach((item: DailyCashflow) => {
+      if (item.expense > topAmount) {
+        topAmount = item.expense;
+        topDay = item.dayKey;
+      }
+    });
+    this.topExpenseDayKey = topDay;
+    this.topExpenseDayAmount = topAmount;
   }
 
   private async loadSelectedDay(): Promise<void> {
@@ -479,6 +509,24 @@ struct CalendarPage {
     const date = new Date(this.selectedTime);
     const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
     return `${date.getMonth() + 1}月${date.getDate()}日 ${weekday}`;
+  }
+
+  private monthInsight(): string {
+    if (this.activeDayCount <= 0) {
+      return '这个月还没有流水，记一笔后会显示月度洞察。';
+    }
+    if (this.topExpenseDayAmount <= 0) {
+      return `本月有 ${this.activeDayCount} 天记录流水，暂时没有支出。`;
+    }
+    return `本月有 ${this.activeDayCount} 天记录流水，最高支出日是 ${this.dayKeyLabel(this.topExpenseDayKey)}，支出 ${NumberUtil.compactMoney(this.topExpenseDayAmount)}。`;
+  }
+
+  private dayKeyLabel(dayKey: string): string {
+    const parts = dayKey.split('-');
+    if (parts.length < 3) {
+      return dayKey;
+    }
+    return `${Number(parts[1])}月${Number(parts[2])}日`;
   }
 
   private dayNumberColor(item: CalendarDayItem): string {
