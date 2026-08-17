@@ -58,6 +58,7 @@ try {
   $module = Read-Json $modulePath
   $pagesJson = Read-Json $pagesPath
   $null = Read-Json $stringsPath
+  $disabledRoutes = New-Object System.Collections.Generic.List[string]
 
   if ($module -ne $null) {
     if ($module.module.requestPermissions.Count -ne 0) {
@@ -66,6 +67,22 @@ try {
     if ($module.module.PSObject.Properties.Name -contains 'extensionAbilities') {
       Add-Failure 'module.json5 must not declare extensionAbilities for this release'
     }
+  }
+
+  if (Test-Path $featureFlagsPath) {
+    $featureFlagsText = Get-Content -Raw -Encoding UTF8 $featureFlagsPath
+    if ($featureFlagsText -notmatch 'AUTO_BOOKKEEPING_VISIBLE:\s*boolean\s*=\s*false') {
+      Add-Failure 'AUTO_BOOKKEEPING_VISIBLE must be false for this release'
+    } else {
+      $disabledRoutes.Add('pages/AutoBookkeeping') | Out-Null
+    }
+    if ($featureFlagsText -notmatch 'ALIPAY_BILL_IMPORT_VISIBLE:\s*boolean\s*=\s*false') {
+      Add-Failure 'ALIPAY_BILL_IMPORT_VISIBLE must be false for this release'
+    } else {
+      $disabledRoutes.Add('pages/AlipayImport') | Out-Null
+    }
+  } else {
+    Add-Failure 'FeatureFlags.ets is missing'
   }
 
   if ($pagesJson -ne $null) {
@@ -81,22 +98,18 @@ try {
     $routeText = Get-Content -Raw -Encoding UTF8 $routesPath
     $routes = [regex]::Matches($routeText, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value }
     foreach ($route in $routes) {
-      if ($pagesJson.src -notcontains $route) {
+      if ($pagesJson.src -notcontains $route -and $disabledRoutes -notcontains $route) {
         Add-Failure "Route is not registered in main_pages.json: $route"
       }
     }
   }
 
-  if (Test-Path $featureFlagsPath) {
-    $featureFlagsText = Get-Content -Raw -Encoding UTF8 $featureFlagsPath
-    if ($featureFlagsText -notmatch 'AUTO_BOOKKEEPING_VISIBLE:\s*boolean\s*=\s*false') {
-      Add-Failure 'AUTO_BOOKKEEPING_VISIBLE must be false for this release'
+  if ($pagesJson -ne $null) {
+    foreach ($disabledRoute in $disabledRoutes) {
+      if ($pagesJson.src -contains $disabledRoute) {
+        Add-Failure "Disabled release page must not be registered: $disabledRoute"
+      }
     }
-    if ($featureFlagsText -notmatch 'ALIPAY_BILL_IMPORT_VISIBLE:\s*boolean\s*=\s*false') {
-      Add-Failure 'ALIPAY_BILL_IMPORT_VISIBLE must be false for this release'
-    }
-  } else {
-    Add-Failure 'FeatureFlags.ets is missing'
   }
 
   $sensitivePatterns = @(

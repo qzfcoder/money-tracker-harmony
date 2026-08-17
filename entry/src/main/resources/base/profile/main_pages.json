@@ -14,8 +14,6 @@
     "pages/Search",
     "pages/Calendar",
     "pages/DataExport",
-    "pages/AlipayImport",
-    "pages/AutoBookkeeping",
     "pages/Settings",
     "pages/About"
   ]
