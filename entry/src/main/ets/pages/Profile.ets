@@ -131,7 +131,7 @@ struct Profile {
       this.ShortcutCard('分类管理', '调整常用分类', '类', AppColors.LEDGER, AppColors.SURFACE_TINT, ROUTES.CATEGORY_MANAGE)
       this.ShortcutCard('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, AppColors.softCyan(), ROUTES.ACCOUNT_MANAGE)
       this.ShortcutCard('预算管理', '控制月度支出', '预', AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
-      this.ShortcutCard('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, AppColors.softGreen(), ROUTES.DATA_EXPORT)
+      this.ShortcutCard('数据导出', '导出 CSV 账单', '导', AppColors.INCOME, AppColors.softGreen(), ROUTES.DATA_EXPORT)
       this.ShortcutCard('设置', '主题与偏好', '设', AppColors.LILAC, AppColors.softPurple(), ROUTES.SETTINGS)
       this.ShortcutCard('关于', '版本与说明', '关', AppColors.MUTED, AppColors.SURFACE_SOFT, ROUTES.ABOUT)
     }

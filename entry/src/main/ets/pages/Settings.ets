@@ -161,7 +161,7 @@ struct Settings {
       this.RouteRow('分类管理', '调整常用分类和排序', ROUTES.CATEGORY_MANAGE)
       this.RouteRow('账户管理', '新增、编辑账户余额', ROUTES.ACCOUNT_MANAGE)
       this.RouteRow('预算管理', '设置月度预算', ROUTES.BUDGET_SETTING)
-      this.RouteRow('数据导出', '导出 CSV 和备份文件', ROUTES.DATA_EXPORT)
+      this.RouteRow('数据导出', '导出 CSV 账单文件', ROUTES.DATA_EXPORT)
       this.RouteRow('关于', '版本和说明', ROUTES.ABOUT)
     }
     .width('100%')
