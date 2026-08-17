@@ -218,6 +218,7 @@ try {
   Assert-FileMatches 'Custom CSV export' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'ExportScope\.CUSTOM'
   Assert-FileMatches 'Custom CSV export date picker' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'DatePickerDialog\.show'
   Assert-FileMatches 'Asset liability summary' (Join-Path $Root 'entry/src/main/ets/viewmodel/AssetsViewModel.ets') 'liabilityBalance'
+  Assert-FileMatches 'Search result CSV export' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'saveSearchCsv'
 
   $deletedFiles = @(
     'entry/src/main/ets/extension/NotificationBookkeepingSubscriber.ets',

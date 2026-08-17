@@ -1,4 +1,6 @@
 import { router } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { fileIo, picker } from '@kit.CoreFileKit';
 import { CategoryModel } from '../model/Category';
 import { RecordListItem, RecordType } from '../model/Record';
 import { CategoryRepository } from '../repository/CategoryRepository';
@@ -9,6 +11,7 @@ import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
 import { RecordItem } from '../components/RecordItem';
 import { AppDatabase } from '../database/AppDatabase';
+import { ToastUtil } from '../utils/ToastUtil';
 
 interface DatePickerResult {
   year?: number;
@@ -140,6 +143,9 @@ struct SearchPage {
       Row({ space: 10 }) {
         this.ActionButton('搜索', () => this.runSearch())
         this.ActionButton('重置', () => this.resetFilters())
+        this.ActionButton('导出结果', () => {
+          this.saveSearchCsv();
+        })
       }
       .width('100%')
     }
@@ -523,6 +529,34 @@ struct SearchPage {
     }
   }
 
+  private async saveSearchCsv(): Promise<void> {
+    try {
+      await this.runSearch();
+      if (this.results.length === 0) {
+        ToastUtil.show('没有可导出的搜索结果');
+        return;
+      }
+      const context = getContext(this) as common.UIAbilityContext;
+      const options = new picker.DocumentSaveOptions();
+      options.newFileNames = [`一页账-搜索结果-${DateUtil.dayKey(Date.now())}.csv`];
+      options.fileSuffixChoices = ['CSV 文件|.csv'];
+      const uris = await new picker.DocumentViewPicker(context).save(options);
+      if (uris.length === 0) {
+        ToastUtil.show('未保存 CSV 文件');
+        return;
+      }
+      const file = fileIo.openSync(uris[0], fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
+      try {
+        fileIo.writeSync(file.fd, `\uFEFF${this.buildSearchCsv()}`);
+      } finally {
+        fileIo.closeSync(file);
+      }
+      ToastUtil.show(`CSV 已保存：${uris[0]}`);
+    } catch (error) {
+      ToastUtil.show(`CSV 未保存：${ToastUtil.error(error)}`);
+    }
+  }
+
   private resetFilters(): void {
     this.keyword = '';
     this.searchType = SearchType.ALL;
@@ -716,6 +750,39 @@ struct SearchPage {
       return item.type === RecordType.EXPENSE ? total + item.amount : total;
     }, 0);
     this.resultBalance = this.resultIncome - this.resultExpense;
+  }
+
+  private buildSearchCsv(): string {
+    const rows: string[] = ['日期,类型,分类,金额,账户,备注'];
+    this.results.forEach((item: RecordListItem) => {
+      rows.push([
+        DateUtil.dayLabel(item.recordTime) + ' ' + DateUtil.timeLabel(item.recordTime),
+        this.typeLabel(item.type),
+        item.categoryName,
+        `${item.type === RecordType.EXPENSE ? '-' : ''}${NumberUtil.plainMoney(item.amount)}`,
+        item.accountName,
+        item.remark
+      ].map((value: string) => this.escapeCsv(value)).join(','));
+    });
+    return rows.join('\n');
+  }
+
+  private escapeCsv(value: string): string {
+    const safeValue = value.replace(/"/g, '""');
+    if (safeValue.indexOf(',') >= 0 || safeValue.indexOf('\n') >= 0 || safeValue.indexOf('"') >= 0) {
+      return `"${safeValue}"`;
+    }
+    return safeValue;
+  }
+
+  private typeLabel(type: RecordType): string {
+    if (type === RecordType.INCOME) {
+      return '收入';
+    }
+    if (type === RecordType.TRANSFER) {
+      return '转账';
+    }
+    return '支出';
   }
 
   private contentMaxWidth(): number {
