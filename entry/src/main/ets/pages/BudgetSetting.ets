@@ -55,6 +55,7 @@ struct BudgetSetting {
         Column({ space: 18 }) {
           this.MonthToolbar()
           this.TotalCard()
+          this.BudgetInsightCard()
           this.CategoryBudgetCard()
         }
         .width('100%')
@@ -263,6 +264,50 @@ struct BudgetSetting {
   }
 
   @Builder
+  private BudgetInsightCard() {
+    Column({ space: 14 }) {
+      Row() {
+        Text('预算提醒')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+        Blank()
+        Text(this.budgetStateLabel())
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.budgetStateColor())
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor(this.budgetStateBgColor())
+          .borderRadius(AppRadius.PILL)
+      }
+      .width('100%')
+
+      if (this.effectiveBudgetAmount() <= 0) {
+        this.EmptyState('还没有预算提醒', '设置月度预算后会显示每日可用金额')
+      } else {
+        Row({ space: 10 }) {
+          this.InfoChip('剩余天数', `${this.daysRemainingInMonth()} 天`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+          this.InfoChip('日均可用', NumberUtil.compactMoney(this.dailyAllowance()), AppColors.CHART_GREEN, AppColors.softGreen())
+          this.InfoChip('本月剩余', NumberUtil.compactMoney(this.remainingTotal()), this.budgetStateColor(), this.budgetStateBgColor())
+        }
+        .width('100%')
+
+        Text(this.budgetAdviceText())
+          .fontSize(13)
+          .fontColor(AppColors.MUTED)
+          .lineHeight(20)
+          .width('100%')
+          .maxLines(2)
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
   private CategoryBudgetCard() {
     Column({ space: 12 }) {
       Row() {
@@ -384,12 +429,19 @@ struct BudgetSetting {
       Text(label)
         .fontSize(12)
         .fontColor(AppColors.MUTED)
+        .maxLines(1)
       Text(value)
         .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor(color)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .textAlign(TextAlign.Center)
     }
     .layoutWeight(1)
+    .height(68)
+    .justifyContent(FlexAlign.Center)
     .padding(12)
     .backgroundColor(bgColor)
     .borderRadius(16)
@@ -545,6 +597,67 @@ struct BudgetSetting {
   private refreshBudgetStats(): void {
     this.remainingTotalValue = this.remainingTotal();
     this.totalProgressValue = this.totalProgress();
+  }
+
+  private daysRemainingInMonth(): number {
+    const today = DateUtil.startOfDay(Date.now());
+    const monthStart = DateUtil.startOfMonth(this.anchorTime);
+    const monthEnd = DateUtil.startOfNextMonth(this.anchorTime);
+    if (today < monthStart) {
+      return Math.max(1, Math.ceil((monthEnd - monthStart) / 86400000));
+    }
+    if (today >= monthEnd) {
+      return 0;
+    }
+    return Math.max(1, Math.ceil((monthEnd - today) / 86400000));
+  }
+
+  private dailyAllowance(): number {
+    const days = this.daysRemainingInMonth();
+    if (days <= 0) {
+      return 0;
+    }
+    return Math.round(this.remainingTotal() / days * 100) / 100;
+  }
+
+  private budgetStateLabel(): string {
+    if (this.effectiveBudgetAmount() <= 0) {
+      return '未设置';
+    }
+    if (this.totalProgress() >= 100) {
+      return '已超支';
+    }
+    if (this.totalProgress() >= 80) {
+      return '快用完';
+    }
+    return '可控';
+  }
+
+  private budgetStateColor(): string {
+    if (this.effectiveBudgetAmount() <= 0 || this.totalProgress() >= 80) {
+      return this.totalProgress() >= 100 ? AppColors.EXPENSE : AppColors.WARNING;
+    }
+    return AppColors.CHART_GREEN;
+  }
+
+  private budgetStateBgColor(): string {
+    if (this.totalProgress() >= 100) {
+      return AppColors.softDanger();
+    }
+    if (this.effectiveBudgetAmount() <= 0 || this.totalProgress() >= 80) {
+      return AppColors.softYellow();
+    }
+    return AppColors.softGreen();
+  }
+
+  private budgetAdviceText(): string {
+    if (this.totalProgress() >= 100) {
+      return `本月已超过预算 ${NumberUtil.compactMoney(this.spentTotal - this.effectiveBudgetAmount())}，建议优先检查高支出分类。`;
+    }
+    if (this.totalProgress() >= 80) {
+      return `预算已用 ${this.totalProgress()}%，剩余 ${this.daysRemainingInMonth()} 天，建议把日支出控制在 ${NumberUtil.compactMoney(this.dailyAllowance())} 以内。`;
+    }
+    return `本月预算还剩 ${NumberUtil.compactMoney(this.remainingTotal())}，按当前进度每天还能使用约 ${NumberUtil.compactMoney(this.dailyAllowance())}。`;
   }
 
   private parseAmount(value: string): number {
