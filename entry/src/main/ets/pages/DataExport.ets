@@ -344,7 +344,7 @@ struct DataExport {
         ToastUtil.show('未保存 CSV 文件');
         return;
       }
-      const file = fileIo.openSync(uris[0], fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
+      const file = fileIo.openSync(uris[0], fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
       try {
         fileIo.writeSync(file.fd, `\uFEFF${this.csvText}`);
       } finally {

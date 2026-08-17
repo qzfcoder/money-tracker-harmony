@@ -229,9 +229,11 @@ try {
   Assert-FileMatches 'Custom CSV export' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'ExportScope\.CUSTOM'
   Assert-FileMatches 'Custom CSV export date picker' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'DatePickerDialog\.show'
   Assert-FileMatches 'Custom CSV export date picker type' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'interface\s+DatePickerResult'
+  Assert-FileMatches 'Custom CSV export write mode' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'OpenMode\.READ_WRITE\s*\|\s*fileIo\.OpenMode\.TRUNC'
   Assert-FileMatches 'Record edit date picker type' (Join-Path $Root 'entry/src/main/ets/pages/RecordEdit.ets') 'interface\s+DatePickerResult'
   Assert-FileMatches 'Asset liability summary' (Join-Path $Root 'entry/src/main/ets/viewmodel/AssetsViewModel.ets') 'liabilityBalance'
   Assert-FileMatches 'Search result CSV export' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'saveSearchCsv'
+  Assert-FileMatches 'Search result CSV export write mode' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'OpenMode\.READ_WRITE\s*\|\s*fileIo\.OpenMode\.TRUNC'
   Assert-FileMatches 'Calendar month insight' (Join-Path $Root 'entry/src/main/ets/pages/Calendar.ets') 'monthInsight'
 
   $deletedFiles = @(
