@@ -1,3 +1,5 @@
+import { NumberUtil } from '../utils/NumberUtil';
+
 @Component
 export struct AmountInput {
   @Link amountText: string;
@@ -26,11 +28,6 @@ export struct AmountInput {
   }
 
   private normalize(value: string): string {
-    const cleaned = value.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return cleaned;
-    }
-    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+    return NumberUtil.normalizeAmountInput(value);
   }
 }

@@ -501,7 +501,7 @@ struct RecordEdit {
   }
 
   private async saveCurrentTemplate(): Promise<void> {
-    const amount = Number(this.normalizeAmount(this.amountText));
+    const amount = NumberUtil.toCentSafe(this.amountText);
     if (!amount || amount <= 0) {
       ToastUtil.show('请输入正确金额');
       return;
@@ -515,7 +515,7 @@ struct RecordEdit {
     const template: RecordTemplateModel = {
       name: remark || this.vm.selectedCategory.name,
       type: this.vm.type,
-      amount: Math.round(amount * 100) / 100,
+      amount,
       categoryId: this.vm.selectedCategory.id || 0,
       accountId: this.vm.selectedAccount.id || 0,
       remark,
@@ -577,12 +577,7 @@ struct RecordEdit {
   }
 
   private normalizeAmount(value: string): string {
-    const cleaned = value.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return cleaned;
-    }
-    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+    return NumberUtil.normalizeAmountInput(value);
   }
 
   private formatAmountInput(value: number): string {

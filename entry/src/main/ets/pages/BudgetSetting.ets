@@ -674,17 +674,11 @@ struct BudgetSetting {
   }
 
   private parseAmount(value: string): number {
-    const normalized = this.normalizeAmount(value);
-    return Number(normalized) || 0;
+    return NumberUtil.toCentSafe(value);
   }
 
   private normalizeAmount(value: string): string {
-    const cleaned = value.replace(/[^0-9.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return cleaned;
-    }
-    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+    return NumberUtil.normalizeAmountInput(value);
   }
 
   private formatBudgetInput(value: number): string {

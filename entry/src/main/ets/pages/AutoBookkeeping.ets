@@ -1113,7 +1113,7 @@ struct AutoBookkeeping {
     if (!item.id) {
       return;
     }
-    const amount = Number(this.editingAmountText);
+    const amount = NumberUtil.toCentSafe(this.editingAmountText);
     if (!amount || amount <= 0) {
       ToastUtil.show('请填写正确金额');
       return;
@@ -1132,7 +1132,7 @@ struct AutoBookkeeping {
       title: item.title,
       content: item.content,
       rawText: item.rawText,
-      amount: Math.round(amount * 100) / 100,
+      amount,
       type: this.editingType,
       categoryId: this.editingCategoryId,
       accountId: this.editingAccountId,
@@ -1280,12 +1280,7 @@ struct AutoBookkeeping {
   }
 
   private normalizeAmount(value: string): string {
-    const cleaned = value.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return cleaned;
-    }
-    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+    return NumberUtil.normalizeAmountInput(value);
   }
 
   private typeMark(type: RecordType.EXPENSE | RecordType.INCOME): string {

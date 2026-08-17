@@ -346,8 +346,8 @@ struct AccountManage {
         id: this.selectedId > 0 ? this.selectedId : undefined,
         name: this.nameText.trim() || '未命名账户',
         type: this.typeValue,
-        balance: Number(this.balanceText) || 0,
-        initialBalance: Number(this.initialText) || 0,
+        balance: NumberUtil.toCentSafe(this.balanceText),
+        initialBalance: NumberUtil.toCentSafe(this.initialText),
         icon: this.iconText.trim() || 'wallet',
         color: this.colorText.trim() || '#2F7EF7',
         isLiability: this.isLiability,
@@ -411,12 +411,7 @@ struct AccountManage {
   }
 
   private normalizeAmount(value: string): string {
-    const cleaned = value.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return cleaned;
-    }
-    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+    return NumberUtil.normalizeAmountInput(value);
   }
 
   private nextSortOrder(): number {

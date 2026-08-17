@@ -46,6 +46,17 @@ function Assert-DecimalInput([string]$file, [string]$binding) {
   }
 }
 
+function Assert-FileMatches([string]$name, [string]$file, [string]$pattern) {
+  if (-not (Test-Path $file)) {
+    Add-Failure "$name file missing: $file"
+    return
+  }
+  $text = Get-Content -Raw -Encoding UTF8 $file
+  if ($text -notmatch $pattern) {
+    Add-Failure "$name missing pattern '$pattern' in $file"
+  }
+}
+
 Push-Location $Root
 try {
   $modulePath = Join-Path $Root 'entry/src/main/module.json5'
@@ -182,6 +193,28 @@ try {
   Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/BudgetSetting.ets') 'item.budgetText'
   Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'this.editingAmountText'
 
+  $amountNormalizeFiles = @(
+    'entry/src/main/ets/components/AmountInput.ets',
+    'entry/src/main/ets/pages/RecordEdit.ets',
+    'entry/src/main/ets/pages/AccountManage.ets',
+    'entry/src/main/ets/pages/BudgetSetting.ets',
+    'entry/src/main/ets/pages/AutoBookkeeping.ets'
+  )
+  foreach ($file in $amountNormalizeFiles) {
+    Assert-FileMatches 'Amount normalize' (Join-Path $Root $file) 'NumberUtil\.normalizeAmountInput'
+  }
+
+  $amountParseFiles = @(
+    'entry/src/main/ets/viewmodel/RecordViewModel.ets',
+    'entry/src/main/ets/pages/RecordEdit.ets',
+    'entry/src/main/ets/pages/AccountManage.ets',
+    'entry/src/main/ets/pages/BudgetSetting.ets',
+    'entry/src/main/ets/pages/AutoBookkeeping.ets'
+  )
+  foreach ($file in $amountParseFiles) {
+    Assert-FileMatches 'Amount parse' (Join-Path $Root $file) 'NumberUtil\.toCentSafe'
+  }
+
   $deletedFiles = @(
     'entry/src/main/ets/extension/NotificationBookkeepingSubscriber.ets',
     'entry/src/main/ets/service/ReminderService.ets'
@@ -208,6 +241,7 @@ try {
   Write-Output 'RELEASE CHECK PASSED'
   Write-Output "Decimal amount inputs: $($decimalMatches.Count)"
   Write-Output "Integer-only inputs: $($numberMatches.Count) sort fields"
+  Write-Output 'Amount validation: shared'
   Write-Output 'Permissions: empty'
   Write-Output 'Extensions: none'
   Write-Output 'Release feature flags: safe'

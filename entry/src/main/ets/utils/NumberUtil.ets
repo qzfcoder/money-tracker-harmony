@@ -20,7 +20,7 @@ export class NumberUtil {
   }
 
   static toCentSafe(value: string): number {
-    const normalized = value.trim();
+    const normalized = NumberUtil.normalizeAmountInput(value).trim();
     if (!normalized) {
       return 0;
     }
@@ -29,5 +29,15 @@ export class NumberUtil {
       return 0;
     }
     return Math.round(numberValue * 100) / 100;
+  }
+
+  static normalizeAmountInput(value: string): string {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return cleaned;
+    }
+    const integerPart = parts[0] || '0';
+    return `${integerPart}.${parts.slice(1).join('').substring(0, 2)}`;
   }
 }

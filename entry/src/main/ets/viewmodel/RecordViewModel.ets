@@ -6,6 +6,7 @@ import { AccountRepository } from '../repository/AccountRepository';
 import { RecordRepository } from '../repository/RecordRepository';
 import { common } from '@kit.AbilityKit';
 import { AppDatabase } from '../database/AppDatabase';
+import { NumberUtil } from '../utils/NumberUtil';
 
 @Observed
 export class RecordViewModel {
@@ -42,7 +43,7 @@ export class RecordViewModel {
   }
 
   async save(): Promise<RecordModel> {
-    const amount = Number(this.amountText);
+    const amount = NumberUtil.toCentSafe(this.amountText);
     if (!this.selectedCategory || !this.selectedAccount || !amount || amount <= 0) {
       throw new Error('请填写金额、分类和账户');
     }
@@ -50,7 +51,7 @@ export class RecordViewModel {
     const record: RecordModel = {
       id: this.recordId > 0 ? this.recordId : undefined,
       type: this.type,
-      amount: Math.round(amount * 100) / 100,
+      amount,
       categoryId: this.selectedCategory.id || 0,
       accountId: this.selectedAccount.id || 0,
       recordTime: this.recordTime > 0 ? this.recordTime : Date.now(),
