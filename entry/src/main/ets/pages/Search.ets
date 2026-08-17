@@ -6,6 +6,7 @@ import { RecordRepository, RecordSearchOptions } from '../repository/RecordRepos
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
 import { ROUTES } from '../constants/RouteConstants';
 import { DateUtil } from '../utils/DateUtil';
+import { NumberUtil } from '../utils/NumberUtil';
 import { RecordItem } from '../components/RecordItem';
 import { AppDatabase } from '../database/AppDatabase';
 
@@ -50,6 +51,9 @@ struct SearchPage {
   @State draftCustomEndTime: number = DateUtil.startOfDay();
   @State categories: CategoryModel[] = [];
   @State results: RecordListItem[] = [];
+  @State resultIncome: number = 0;
+  @State resultExpense: number = 0;
+  @State resultBalance: number = 0;
   @State loading: boolean = false;
 
   aboutToAppear(): void {
@@ -66,6 +70,7 @@ struct SearchPage {
           this.FilterPanel()
           this.RangePanel()
           this.ResultHeader()
+          this.ResultSummary()
           this.ResultList()
         }
         .width('100%')
@@ -299,6 +304,44 @@ struct SearchPage {
   }
 
   @Builder
+  private ResultSummary() {
+    Row({ space: 10 }) {
+      this.SummaryChip('收入', NumberUtil.compactMoney(this.resultIncome), AppColors.CHART_GREEN, AppColors.softGreen())
+      this.SummaryChip('支出', NumberUtil.compactMoney(this.resultExpense), AppColors.CHART_PINK, AppColors.softPink())
+      this.SummaryChip('结余', NumberUtil.compactMoney(this.resultBalance), this.resultBalance >= 0 ? AppColors.CHART_BLUE : AppColors.EXPENSE, AppColors.SURFACE_TINT)
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private SummaryChip(label: string, value: string, color: string, bgColor: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .maxLines(1)
+      Text(value)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .textAlign(TextAlign.Center)
+    }
+    .layoutWeight(1)
+    .height(62)
+    .justifyContent(FlexAlign.Center)
+    .padding(10)
+    .backgroundColor(bgColor)
+    .borderRadius(16)
+  }
+
+  @Builder
   private ResultList() {
     Column({ space: 10 }) {
       if (this.loading) {
@@ -367,6 +410,7 @@ struct SearchPage {
       .shadow(this.searchType === type ? { radius: 10, color: AppColors.SHADOW, offsetY: 4 } : { radius: 0, color: '#00000000', offsetY: 0 })
       .onClick(() => {
         this.searchType = type;
+        this.syncCategoryForType();
         this.runSearch();
       })
   }
@@ -470,8 +514,10 @@ struct SearchPage {
         options.endTime = this.endTime;
       }
       this.results = await this.recordRepository.searchRecords(options);
+      this.refreshResultSummary();
     } catch (error) {
       this.results = [];
+      this.refreshResultSummary();
     } finally {
       this.loading = false;
     }
@@ -643,6 +689,33 @@ struct SearchPage {
       return this.categories.filter((item: CategoryModel) => item.type === RecordType.INCOME);
     }
     return this.categories;
+  }
+
+  private syncCategoryForType(): void {
+    if (this.selectedCategoryId <= 0) {
+      return;
+    }
+    const selected = this.categories.find((item: CategoryModel) => item.id === this.selectedCategoryId);
+    if (!selected) {
+      this.selectedCategoryId = 0;
+      return;
+    }
+    if (this.searchType === SearchType.EXPENSE && selected.type !== RecordType.EXPENSE) {
+      this.selectedCategoryId = 0;
+    }
+    if (this.searchType === SearchType.INCOME && selected.type !== RecordType.INCOME) {
+      this.selectedCategoryId = 0;
+    }
+  }
+
+  private refreshResultSummary(): void {
+    this.resultIncome = this.results.reduce((total: number, item: RecordListItem) => {
+      return item.type === RecordType.INCOME ? total + item.amount : total;
+    }, 0);
+    this.resultExpense = this.results.reduce((total: number, item: RecordListItem) => {
+      return item.type === RecordType.EXPENSE ? total + item.amount : total;
+    }, 0);
+    this.resultBalance = this.resultIncome - this.resultExpense;
   }
 
   private contentMaxWidth(): number {
