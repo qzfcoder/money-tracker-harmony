@@ -9,13 +9,22 @@ import { NumberUtil } from '../utils/NumberUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { AppDatabase } from '../database/AppDatabase';
 
+enum ExportScope {
+  MONTH = 'month',
+  RECENT = 'recent'
+}
+
 @Entry
 @Component
 struct DataExport {
   private repository: RecordRepository = new RecordRepository();
 
+  @State exportScope: ExportScope = ExportScope.MONTH;
   @State records: RecordListItem[] = [];
   @State csvText: string = '';
+  @State incomeTotal: number = 0;
+  @State expenseTotal: number = 0;
+  @State balanceTotal: number = 0;
 
   aboutToAppear(): void {
     this.loadRecords();
@@ -27,6 +36,7 @@ struct DataExport {
       Scroll() {
         Column({ space: 16 }) {
           this.SummaryCard()
+          this.ScopeCard()
           this.PreviewCard()
         }
         .width('100%')
@@ -78,7 +88,7 @@ struct DataExport {
     Column({ space: 14 }) {
       Row() {
         Column({ space: 4 }) {
-          Text('可导出账单')
+          Text(this.scopeTitle())
             .fontSize(13)
             .fontColor(AppColors.MUTED)
           Text(`${this.records.length} 条`)
@@ -98,7 +108,14 @@ struct DataExport {
           .onClick(() => this.loadRecords())
       }
       .width('100%')
-      Text('可导出最近 1000 条流水。点击保存后选择文件位置，可直接使用表格应用打开。')
+      Row({ space: 10 }) {
+        this.InfoChip('收入', NumberUtil.compactMoney(this.incomeTotal), AppColors.CHART_GREEN, AppColors.softGreen())
+        this.InfoChip('支出', NumberUtil.compactMoney(this.expenseTotal), AppColors.CHART_PINK, AppColors.softPink())
+        this.InfoChip('结余', NumberUtil.compactMoney(this.balanceTotal), this.balanceTotal >= 0 ? AppColors.CHART_BLUE : AppColors.EXPENSE, AppColors.SURFACE_TINT)
+      }
+      .width('100%')
+
+      Text(`${this.scopeHint()}。点击保存后选择文件位置，可直接使用表格应用打开。`)
         .fontSize(12)
         .fontColor(AppColors.MUTED)
         .lineHeight(20)
@@ -109,6 +126,69 @@ struct DataExport {
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private ScopeCard() {
+    Column({ space: 12 }) {
+      Text('导出范围')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+        .width('100%')
+
+      Row({ space: 10 }) {
+        this.ScopeButton('本月账单', ExportScope.MONTH)
+        this.ScopeButton('最近 1000 条', ExportScope.RECENT)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private ScopeButton(label: string, scope: ExportScope) {
+    Text(label)
+      .fontSize(14)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(this.exportScope === scope ? AppColors.SURFACE : AppColors.INK)
+      .height(44)
+      .layoutWeight(1)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(this.exportScope === scope ? AppColors.CHART_BLUE : AppColors.SURFACE_SOFT)
+      .borderRadius(AppRadius.PILL)
+      .onClick(() => {
+        this.exportScope = scope;
+        this.loadRecords();
+      })
+  }
+
+  @Builder
+  private InfoChip(label: string, value: string, color: string, bgColor: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .maxLines(1)
+      Text(value)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .textAlign(TextAlign.Center)
+    }
+    .layoutWeight(1)
+    .height(66)
+    .justifyContent(FlexAlign.Center)
+    .padding(10)
+    .backgroundColor(bgColor)
+    .borderRadius(16)
   }
 
   @Builder
@@ -159,8 +239,9 @@ struct DataExport {
   private async loadRecords(): Promise<void> {
     try {
       await AppDatabase.getInstance().init(getContext(this));
-      this.records = await this.repository.listRecent(1000, 0);
+      this.records = await this.loadScopedRecords();
       this.csvText = this.buildCsv(this.records);
+      this.refreshTotals();
     } catch (error) {
       ToastUtil.show('账单数据加载失败，请重试');
     }
@@ -169,11 +250,12 @@ struct DataExport {
   private async saveCsv(): Promise<void> {
     try {
       await AppDatabase.getInstance().init(getContext(this));
-      this.records = await this.repository.listRecent(1000, 0);
+      this.records = await this.loadScopedRecords();
       this.csvText = this.buildCsv(this.records);
+      this.refreshTotals();
       const context = getContext(this) as common.UIAbilityContext;
       const options = new picker.DocumentSaveOptions();
-      options.newFileNames = [`一页账-${DateUtil.dayKey(Date.now())}.csv`];
+      options.newFileNames = [`一页账-${this.fileNameSuffix()}.csv`];
       options.fileSuffixChoices = ['CSV 文件|.csv'];
       const uris = await new picker.DocumentViewPicker(context).save(options);
       if (uris.length === 0) {
@@ -190,6 +272,23 @@ struct DataExport {
     } catch (error) {
       ToastUtil.show(`CSV 未保存：${ToastUtil.error(error)}`);
     }
+  }
+
+  private async loadScopedRecords(): Promise<RecordListItem[]> {
+    if (this.exportScope === ExportScope.MONTH) {
+      return await this.repository.listByRange(DateUtil.startOfMonth(), DateUtil.startOfNextMonth(), 1000, 0);
+    }
+    return await this.repository.listRecent(1000, 0);
+  }
+
+  private refreshTotals(): void {
+    this.incomeTotal = this.records.reduce((total: number, item: RecordListItem) => {
+      return item.type === RecordType.INCOME ? total + item.amount : total;
+    }, 0);
+    this.expenseTotal = this.records.reduce((total: number, item: RecordListItem) => {
+      return item.type === RecordType.EXPENSE ? total + item.amount : total;
+    }, 0);
+    this.balanceTotal = this.incomeTotal - this.expenseTotal;
   }
 
   private buildCsv(records: RecordListItem[]): string {
@@ -223,6 +322,21 @@ struct DataExport {
       return this.csvText;
     }
     return this.csvText.substring(0, 1200) + '\n...';
+  }
+
+  private scopeTitle(): string {
+    return this.exportScope === ExportScope.MONTH ? '本月可导出账单' : '可导出账单';
+  }
+
+  private scopeHint(): string {
+    return this.exportScope === ExportScope.MONTH ? '当前导出本月流水，最多 1000 条' : '当前导出最近 1000 条流水';
+  }
+
+  private fileNameSuffix(): string {
+    if (this.exportScope === ExportScope.MONTH) {
+      return DateUtil.monthKey(Date.now());
+    }
+    return DateUtil.dayKey(Date.now());
   }
 
   private typeLabel(type: RecordType): string {
