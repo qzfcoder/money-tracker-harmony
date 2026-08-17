@@ -57,6 +57,16 @@ function Assert-FileMatches([string]$name, [string]$file, [string]$pattern) {
   }
 }
 
+function Assert-DatePickerTypes([string]$path) {
+  $files = Get-ChildItem -Path $path -Recurse -File -Filter '*.ets' -ErrorAction SilentlyContinue
+  foreach ($file in $files) {
+    $text = Get-Content -Raw -Encoding UTF8 $file.FullName
+    if ($text -match 'DatePickerDialog\.show' -and $text -notmatch 'interface\s+DatePickerResult') {
+      Add-Failure "DatePickerDialog file missing DatePickerResult interface: $($file.FullName)"
+    }
+  }
+}
+
 Push-Location $Root
 try {
   $modulePath = Join-Path $Root 'entry/src/main/module.json5'
@@ -192,6 +202,7 @@ try {
   Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/BudgetSetting.ets') 'this.totalBudgetText'
   Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/BudgetSetting.ets') 'item.budgetText'
   Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'this.editingAmountText'
+  Assert-DatePickerTypes $etsRoot
 
   $amountNormalizeFiles = @(
     'entry/src/main/ets/components/AmountInput.ets',
@@ -217,6 +228,8 @@ try {
 
   Assert-FileMatches 'Custom CSV export' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'ExportScope\.CUSTOM'
   Assert-FileMatches 'Custom CSV export date picker' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'DatePickerDialog\.show'
+  Assert-FileMatches 'Custom CSV export date picker type' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'interface\s+DatePickerResult'
+  Assert-FileMatches 'Record edit date picker type' (Join-Path $Root 'entry/src/main/ets/pages/RecordEdit.ets') 'interface\s+DatePickerResult'
   Assert-FileMatches 'Asset liability summary' (Join-Path $Root 'entry/src/main/ets/viewmodel/AssetsViewModel.ets') 'liabilityBalance'
   Assert-FileMatches 'Search result CSV export' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'saveSearchCsv'
   Assert-FileMatches 'Calendar month insight' (Join-Path $Root 'entry/src/main/ets/pages/Calendar.ets') 'monthInsight'

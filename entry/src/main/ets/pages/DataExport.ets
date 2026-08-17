@@ -15,6 +15,12 @@ enum ExportScope {
   CUSTOM = 'custom'
 }
 
+interface DatePickerResult {
+  year?: number;
+  month?: number;
+  day?: number;
+}
+
 @Entry
 @Component
 struct DataExport {

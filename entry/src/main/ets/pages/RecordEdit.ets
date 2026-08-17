@@ -16,6 +16,12 @@ interface RecordEditParams {
   recordTime?: number;
 }
 
+interface DatePickerResult {
+  year?: number;
+  month?: number;
+  day?: number;
+}
+
 @Entry
 @Component
 struct RecordEdit {
