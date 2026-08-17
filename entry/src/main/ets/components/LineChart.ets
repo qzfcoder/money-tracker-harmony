@@ -9,6 +9,7 @@ export struct LineChart {
   @Prop @Watch('onTotalsChanged') totalExpense: number = 0;
   @Prop @Watch('onRefreshKeyChanged') refreshKey: number = 0;
   @State viewportWidth: number = 0;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
   private readonly chartHeight: number = 196;
   private readonly plotTop: number = 10;
   private readonly plotBottom: number = 34;
@@ -24,12 +25,12 @@ export struct LineChart {
         Text('Y轴  金额（元）')
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#536D80')
+          .fontColor(AppColors.MUTED)
         Blank()
         Text('X轴  时间')
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#536D80')
+          .fontColor(AppColors.MUTED)
       }
       .width('100%')
 
@@ -41,13 +42,13 @@ export struct LineChart {
             .id(this.canvasKey())
             .width(this.chartWidth())
             .height(this.chartHeight)
-            .backgroundColor('#F7FBFF')
+            .backgroundColor(AppColors.PANEL)
             .onReady(() => this.drawChart())
             .onAreaChange(() => this.drawChart())
         }
         .layoutWeight(1)
         .height(this.chartHeight)
-        .backgroundColor('#F7FBFF')
+        .backgroundColor(AppColors.PANEL)
         .borderRadius(16)
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Auto)
@@ -106,7 +107,7 @@ export struct LineChart {
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.CHART_BLUE)
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .backgroundColor('#EAF4FF')
+        .backgroundColor(AppColors.softBlue())
         .borderRadius(999)
     }
     .width('100%')
@@ -143,13 +144,13 @@ export struct LineChart {
     Column() {
       Text(this.axisText(this.axisMax()))
         .fontSize(13)
-        .fontColor('#536D80')
+        .fontColor(AppColors.MUTED)
       Text(this.axisText(this.axisMax() / 2))
         .fontSize(13)
-        .fontColor('#536D80')
+        .fontColor(AppColors.MUTED)
       Text('0')
         .fontSize(13)
-        .fontColor('#536D80')
+        .fontColor(AppColors.MUTED)
     }
     .width(42)
     .height(this.chartHeight - this.plotTop - this.plotBottom)
@@ -170,7 +171,7 @@ export struct LineChart {
     const max = this.axisMax();
 
     this.context.clearRect(0, 0, width, height);
-    this.context.fillStyle = '#F7FBFF';
+    this.context.fillStyle = AppColors.PANEL;
     this.context.fillRect(0, 0, width, height);
     this.context.lineCap = 'round';
     this.context.lineJoin = 'round';
@@ -206,7 +207,7 @@ export struct LineChart {
   }
 
   private drawGrid(left: number, top: number, plotWidth: number, plotHeight: number): void {
-    this.context.strokeStyle = '#D9E7F2';
+    this.context.strokeStyle = AppColors.LINE;
     this.context.lineWidth = 0.6;
     for (let index = 0; index <= 2; index++) {
       const y = top + plotHeight / 2 * index;
@@ -216,7 +217,7 @@ export struct LineChart {
       this.context.stroke();
     }
 
-    this.context.strokeStyle = '#6D879A';
+    this.context.strokeStyle = AppColors.MUTED;
     this.context.lineWidth = 1;
     this.context.beginPath();
     this.context.moveTo(left, top);
@@ -282,7 +283,7 @@ export struct LineChart {
   private drawXLabels(left: number, top: number, plotWidth: number, plotHeight: number): void {
     const slotWidth = plotWidth / Math.max(1, this.points.length);
     const y = top + plotHeight + 22;
-    this.context.fillStyle = '#536D80';
+    this.context.fillStyle = AppColors.MUTED;
     this.context.font = `bold ${vp2px(12)}px sans-serif`;
     this.context.textAlign = 'center';
     this.points.forEach((point: TrendPoint, index: number) => {
@@ -340,7 +341,7 @@ export struct LineChart {
   private canvasKey(): string {
     const first = this.points.length > 0 ? this.points[0].label : 'empty';
     const last = this.points.length > 0 ? this.points[this.points.length - 1].label : 'empty';
-    return `line-chart-${first}-${last}-${this.points.length}-${this.maxValue()}-${this.totalValue()}-${this.totalIncome}-${this.totalExpense}-${this.refreshKey}`;
+    return `line-chart-${first}-${last}-${this.points.length}-${this.maxValue()}-${this.totalValue()}-${this.totalIncome}-${this.totalExpense}-${this.refreshKey}-${this.isDarkMode}`;
   }
 
   private totalValue(): number {

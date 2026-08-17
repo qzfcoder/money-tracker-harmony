@@ -40,6 +40,7 @@ export struct StatisticsDashboard {
   @State customEditorVisible: boolean = false;
   @State draftCustomStartTime: number = DateUtil.addDays(DateUtil.startOfDay(), -29);
   @State draftCustomEndTime: number = DateUtil.startOfDay();
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
 
   aboutToAppear(): void {
     this.refreshData();
@@ -135,7 +136,7 @@ export struct StatisticsDashboard {
     .height(this.isPhone() ? 44 : 50)
     .padding(4)
     .width('100%')
-    .backgroundColor('#E7EAEE')
+    .backgroundColor(AppColors.TRACK)
     .borderRadius(AppRadius.PILL)
   }
 
@@ -148,7 +149,7 @@ export struct StatisticsDashboard {
           .fontColor(AppColors.CHART_BLUE)
           .width(42)
           .height(this.isPhone() ? 34 : 38)
-          .backgroundColor('#EAF4FF')
+          .backgroundColor(AppColors.softBlue())
           .borderRadius(19)
           .onClick(() => {
             this.movePrevious();
@@ -166,7 +167,7 @@ export struct StatisticsDashboard {
           .fontColor(AppColors.CHART_BLUE)
           .width(42)
           .height(this.isPhone() ? 34 : 38)
-          .backgroundColor('#EAF4FF')
+          .backgroundColor(AppColors.softBlue())
           .borderRadius(19)
           .onClick(() => {
             this.moveNext();
@@ -339,7 +340,7 @@ export struct StatisticsDashboard {
 
         if (this.isTablet()) {
           Column({ space: 12 }) {
-            this.InfluenceTile('主要影响', this.primaryImpact(), AppColors.CHART_CYAN, '#E5F8F6')
+            this.InfluenceTile('主要影响', this.primaryImpact(), AppColors.CHART_CYAN, AppColors.softCyan())
             Column()
               .width('100%')
               .height(1)
@@ -349,7 +350,7 @@ export struct StatisticsDashboard {
           .width('100%')
         } else {
           Row({ space: 0 }) {
-            this.InfluenceTile('主要影响', this.primaryImpact(), AppColors.CHART_CYAN, '#E5F8F6')
+            this.InfluenceTile('主要影响', this.primaryImpact(), AppColors.CHART_CYAN, AppColors.softCyan())
             Column()
               .width(1)
               .height(64)
@@ -377,9 +378,9 @@ export struct StatisticsDashboard {
         .width('100%')
 
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-        this.DimensionCard('收入', () => NumberUtil.money(this.income), '入', AppColors.CHART_GREEN, '#E6F7EF')
-        this.DimensionCard('支出', () => NumberUtil.money(this.expense), '支', AppColors.CHART_PINK, '#FFEAF0')
-        this.DimensionCard('结余', () => NumberUtil.money(this.balance), '余', AppColors.CHART_BLUE, '#EAF4FF')
+        this.DimensionCard('收入', () => NumberUtil.money(this.income), '入', AppColors.CHART_GREEN, AppColors.softGreen())
+        this.DimensionCard('支出', () => NumberUtil.money(this.expense), '支', AppColors.CHART_PINK, AppColors.softPink())
+        this.DimensionCard('结余', () => NumberUtil.money(this.balance), '余', AppColors.CHART_BLUE, AppColors.softBlue())
       }
       .width('100%')
     }
@@ -494,7 +495,7 @@ export struct StatisticsDashboard {
       }
       .height(this.isPhone() ? 42 : 48)
       .padding(4)
-      .backgroundColor('#E5EBF2')
+      .backgroundColor(AppColors.TRACK)
       .borderRadius(AppRadius.PILL)
 
       if (this.chartMode === TrendChartMode.LINE) {
@@ -555,7 +556,7 @@ export struct StatisticsDashboard {
       .layoutWeight(1)
       .borderRadius(AppRadius.PILL)
       .backgroundColor(this.chartMode === mode ? AppColors.SURFACE : '#00000000')
-      .border({ width: this.chartMode === mode ? 1 : 0, color: '#DCE7F2' })
+      .border({ width: this.chartMode === mode ? 1 : 0, color: AppColors.LINE })
       .shadow(this.chartMode === mode ? { radius: 10, color: AppColors.SHADOW, offsetY: 4 } : { radius: 0, color: '#00000000', offsetY: 0 })
       .onClick(() => {
         this.chartMode = mode;
@@ -569,7 +570,7 @@ export struct StatisticsDashboard {
         Column()
           .width(2)
           .height(16)
-          .backgroundColor('#D6E2EC')
+          .backgroundColor(AppColors.LINE)
           .borderRadius(1)
           .margin({ left: 2, top: 1 })
         Column()
@@ -609,7 +610,7 @@ export struct StatisticsDashboard {
         Column()
           .width(2)
           .height(16)
-          .backgroundColor('#D6E2EC')
+          .backgroundColor(AppColors.LINE)
           .borderRadius(1)
         Column()
           .width(5)
@@ -749,12 +750,12 @@ export struct StatisticsDashboard {
       return AppColors.SURFACE_TINT;
     }
     if (score >= 55) {
-      return '#E6F7EF';
+      return AppColors.softGreen();
     }
     if (score >= 40) {
-      return '#FFF4DE';
+      return AppColors.softYellow();
     }
-    return '#FFEAF0';
+    return AppColors.softPink();
   }
 
   private primaryImpact(): string {

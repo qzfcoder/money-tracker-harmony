@@ -95,7 +95,7 @@ struct About {
     Column({ space: 12 }) {
       this.InfoRow('版本', '1.0.1')
       this.InfoRow('数据结构', '账单 / 分类 / 账户 / 预算')
-      this.InfoRow('权限原则', '最小必要权限')
+      this.InfoRow('系统能力', '按需调用')
       if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
         this.InfoRow('主动识别', '先待确认，再手动入账')
         this.InfoRow('OCR 文本', '仅用于本机规则匹配')
@@ -126,16 +126,16 @@ struct About {
   @Builder
   private PolicyCard() {
     Column({ space: 14 }) {
-      Text('隐私政策与用户协议')
+      Text('数据说明')
         .fontSize(20)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.INK)
         .width('100%')
       this.PolicySection('数据说明', '一页账用于记录收支、预算、账户和统计数据。账单数据保存在应用数据区，用于页面展示、筛选、统计和导出。')
-      this.PolicySection('权限说明', '应用默认仅声明记账提醒所需权限。导出 CSV 或报表时会调用系统文件选择器，由用户主动选择保存位置。')
-      this.PolicySection('主动识别', FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? '开启主动识别后，应用不会后台截屏，不读取支付应用数据。用户手动选择账单截图后，OCR 文本仅在本机解析，识别结果先进入待确认账单，用户确认后才入账。' : '当前版本未开启通知自动识别功能，不申请短信读取或通知监听权限。')
+      this.PolicySection('文件处理', '导出 CSV 或报表时会调用系统文件选择器，由用户主动选择保存位置。')
+      this.PolicySection('主动识别', FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? '开启主动识别后，用户手动选择账单截图，OCR 文本仅在本机解析，识别结果先进入待确认账单，用户确认后才入账。' : '当前版本以手动记账、统计和导出为主。')
       this.PolicySection('用户控制', '用户可以编辑、删除账单，导出 CSV 文件，也可以通过系统卸载应用清除应用数据。')
-      Text('正式上架时，请在华为 AGC 后台配置公网可访问的隐私政策链接，并保持内容与本页说明一致。')
+      Text('正式上架时，请在华为 AGC 控制台按应用市场要求配置对应说明链接，并保持内容与本页说明一致。')
         .fontSize(12)
         .fontColor(AppColors.MUTED)
         .lineHeight(20)

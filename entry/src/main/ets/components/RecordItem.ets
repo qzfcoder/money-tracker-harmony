@@ -49,15 +49,19 @@ export struct RecordItem {
       .layoutWeight(1)
 
       Column({ space: 4 }) {
-        Text(`${this.item.type === RecordType.EXPENSE ? '-' : '+'}${NumberUtil.money(this.item.amount)}`)
-          .fontSize(18)
+        Text(`${this.item.type === RecordType.EXPENSE ? '-' : '+'}${NumberUtil.compactMoney(this.item.amount)}`)
+          .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.item.type === RecordType.EXPENSE ? AppColors.EXPENSE : AppColors.INCOME)
           .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: 124 })
         Text(this.item.accountName)
           .fontSize(11)
           .fontColor(AppColors.FAINT)
           .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: 124 })
       }
       .alignItems(HorizontalAlign.End)
     }

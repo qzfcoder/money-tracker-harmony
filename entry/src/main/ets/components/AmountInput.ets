@@ -10,7 +10,7 @@ export struct AmountInput {
         .width('100%')
 
       TextInput({ text: this.amountText, placeholder: '0.00' })
-        .type(InputType.Number)
+        .type(InputType.NUMBER_DECIMAL)
         .fontSize(36)
         .fontWeight(FontWeight.Bold)
         .fontColor('#171A15')
@@ -34,4 +34,3 @@ export struct AmountInput {
     return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
   }
 }
-

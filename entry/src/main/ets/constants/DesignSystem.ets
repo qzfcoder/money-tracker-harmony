@@ -1,8 +1,11 @@
 export class AppColors {
+  static IS_DARK: boolean = false;
   static CANVAS: string = '#F1FAFF';
   static SURFACE: string = '#FFFFFF';
   static SURFACE_SOFT: string = '#F6FBFF';
   static SURFACE_TINT: string = '#EAF4FF';
+  static PANEL: string = '#F7FBFF';
+  static TRACK: string = '#EAF0F6';
   static INK: string = '#10263D';
   static MUTED: string = '#6E8093';
   static FAINT: string = '#A4B3C4';
@@ -23,10 +26,13 @@ export class AppColors {
   static SHADOW: string = '#315F7D12';
 
   static useLight(): void {
+    AppColors.IS_DARK = false;
     AppColors.CANVAS = '#F1FAFF';
     AppColors.SURFACE = '#FFFFFF';
     AppColors.SURFACE_SOFT = '#F6FBFF';
     AppColors.SURFACE_TINT = '#EAF4FF';
+    AppColors.PANEL = '#F7FBFF';
+    AppColors.TRACK = '#EAF0F6';
     AppColors.INK = '#10263D';
     AppColors.MUTED = '#6E8093';
     AppColors.FAINT = '#A4B3C4';
@@ -48,14 +54,17 @@ export class AppColors {
   }
 
   static useDark(): void {
-    AppColors.CANVAS = '#0B1220';
-    AppColors.SURFACE = '#162235';
-    AppColors.SURFACE_SOFT = '#101A2B';
-    AppColors.SURFACE_TINT = '#213653';
-    AppColors.INK = '#EEF6FF';
-    AppColors.MUTED = '#9FB0C4';
-    AppColors.FAINT = '#65778F';
-    AppColors.LINE = '#25364C';
+    AppColors.IS_DARK = true;
+    AppColors.CANVAS = '#0A101B';
+    AppColors.SURFACE = '#172235';
+    AppColors.SURFACE_SOFT = '#101927';
+    AppColors.SURFACE_TINT = '#203A5C';
+    AppColors.PANEL = '#111D2D';
+    AppColors.TRACK = '#26364A';
+    AppColors.INK = '#F3F8FF';
+    AppColors.MUTED = '#B8C6D8';
+    AppColors.FAINT = '#8292A8';
+    AppColors.LINE = '#2A3B51';
     AppColors.LEDGER = '#7DB3FF';
     AppColors.LEDGER_DARK = '#DCEBFF';
     AppColors.INCOME = '#4ED99A';
@@ -69,7 +78,35 @@ export class AppColors {
     AppColors.CHART_PINK = '#FF8AA2';
     AppColors.CHART_PURPLE = '#A99CFF';
     AppColors.CHART_GREEN = '#4ED99A';
-    AppColors.SHADOW = '#00000028';
+    AppColors.SHADOW = '#00000036';
+  }
+
+  static softBlue(): string {
+    return AppColors.IS_DARK ? '#183A63' : '#EAF4FF';
+  }
+
+  static softGreen(): string {
+    return AppColors.IS_DARK ? '#123B2D' : '#E6F7EF';
+  }
+
+  static softPink(): string {
+    return AppColors.IS_DARK ? '#4A2030' : '#FFEAF0';
+  }
+
+  static softYellow(): string {
+    return AppColors.IS_DARK ? '#473416' : '#FFF4DE';
+  }
+
+  static softCyan(): string {
+    return AppColors.IS_DARK ? '#123C3B' : '#E5F8F6';
+  }
+
+  static softPurple(): string {
+    return AppColors.IS_DARK ? '#302A5A' : '#EEEBFF';
+  }
+
+  static softDanger(): string {
+    return AppColors.IS_DARK ? '#4A241E' : '#FCE9E4';
   }
 }
 

@@ -1,6 +1,5 @@
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import image from '@ohos.multimedia.image';
-import screenshot from '@ohos.screenshot';
 import { textRecognition } from '@kit.CoreVisionKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { ToastUtil } from '../utils/ToastUtil';
@@ -11,14 +10,6 @@ export interface OcrBookkeepingResult {
 }
 
 export class OcrBookkeepingService {
-  static async pickScreenAndRecognize(): Promise<OcrBookkeepingResult | null> {
-    const pickInfo = await screenshot.pick();
-    if (!pickInfo || !pickInfo.pixelMap) {
-      return null;
-    }
-    return await OcrBookkeepingService.recognizePixelMap(pickInfo.pixelMap, 'screen-pick');
-  }
-
   static async pickScreenshotAndRecognize(): Promise<OcrBookkeepingResult | null> {
     const picker = new photoAccessHelper.PhotoViewPicker();
     const options = new photoAccessHelper.PhotoSelectOptions();

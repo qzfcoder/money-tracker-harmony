@@ -1,8 +1,6 @@
 import { RecordType } from './Record';
 
 export enum AutoCaptureSource {
-  NOTIFICATION = 'notification',
-  SMS = 'sms',
   MANUAL = 'manual'
 }
 
@@ -31,7 +29,7 @@ export interface AutoRuleModel {
   categoryColor?: string;
 }
 
-export interface AutoNotificationPayload {
+export interface AutoCapturePayload {
   source: AutoCaptureSource;
   bundleName: string;
   appName: string;

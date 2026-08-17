@@ -247,6 +247,84 @@ export class RecordRepository {
     });
   }
 
+  async expenseTotal(startTime: number, endTime: number): Promise<number> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const result = await this.store().querySql(
+      `SELECT COALESCE(SUM(amount), 0) AS total_amount
+      FROM t_record
+      WHERE type = ? AND ((record_time >= ? AND record_time < ?) OR (record_time >= ? AND record_time < ?))`,
+      [RecordType.EXPENSE, startTime, endTime, startSecond, endSecond]
+    );
+    let total = 0;
+    if (result.goToFirstRow()) {
+      total = result.getDouble(result.getColumnIndex('total_amount'));
+    }
+    result.close();
+    return total;
+  }
+
+  async expenseByCategory(startTime: number, endTime: number): Promise<Map<number, number>> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const result = await this.store().querySql(
+      `SELECT category_id, COALESCE(SUM(amount), 0) AS total_amount
+      FROM t_record
+      WHERE type = ? AND ((record_time >= ? AND record_time < ?) OR (record_time >= ? AND record_time < ?))
+      GROUP BY category_id`,
+      [RecordType.EXPENSE, startTime, endTime, startSecond, endSecond]
+    );
+    const map = new Map<number, number>();
+    while (result.goToNextRow()) {
+      map.set(
+        result.getLong(result.getColumnIndex('category_id')),
+        result.getDouble(result.getColumnIndex('total_amount'))
+      );
+    }
+    result.close();
+    return map;
+  }
+
+  async expenseTotalByMonth(month: string): Promise<number> {
+    const result = await this.store().querySql(
+      `SELECT COALESCE(SUM(ABS(amount)), 0) AS total_amount
+      FROM t_record
+      WHERE type = ? AND (
+        strftime('%Y-%m', record_time / 1000, 'unixepoch', 'localtime') = ?
+        OR strftime('%Y-%m', record_time, 'unixepoch', 'localtime') = ?
+      )`,
+      [RecordType.EXPENSE, month, month]
+    );
+    let total = 0;
+    if (result.goToFirstRow()) {
+      total = result.getDouble(result.getColumnIndex('total_amount'));
+    }
+    result.close();
+    return total;
+  }
+
+  async expenseByCategoryByMonth(month: string): Promise<Map<number, number>> {
+    const result = await this.store().querySql(
+      `SELECT category_id, COALESCE(SUM(ABS(amount)), 0) AS total_amount
+      FROM t_record
+      WHERE type = ? AND (
+        strftime('%Y-%m', record_time / 1000, 'unixepoch', 'localtime') = ?
+        OR strftime('%Y-%m', record_time, 'unixepoch', 'localtime') = ?
+      )
+      GROUP BY category_id`,
+      [RecordType.EXPENSE, month, month]
+    );
+    const map = new Map<number, number>();
+    while (result.goToNextRow()) {
+      map.set(
+        result.getLong(result.getColumnIndex('category_id')),
+        result.getDouble(result.getColumnIndex('total_amount'))
+      );
+    }
+    result.close();
+    return map;
+  }
+
   async trendByDay(startTime: number, endTime: number): Promise<TrendPoint[]> {
     return this.trendByFormat(startTime, endTime, '%Y-%m-%d');
   }

@@ -7,18 +7,6 @@
     {
       "name": "entry_desc",
       "value": "一页账入口"
-    },
-    {
-      "name": "permission_reminder_reason",
-      "value": "用于用户开启记账提醒后按设定时间发送本机提醒通知。"
-    },
-    {
-      "name": "permission_subscribe_notification_reason",
-      "value": "用于开启自动记账时读取交易推送通知，识别结果会先进入待确认账单。"
-    },
-    {
-      "name": "auto_notification_desc",
-      "value": "自动记账通知接收"
     }
   ]
 }

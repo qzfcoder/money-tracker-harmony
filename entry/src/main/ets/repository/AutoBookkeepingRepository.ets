@@ -1,6 +1,6 @@
 import { relationalStore } from '@kit.ArkData';
 import { AppDatabase } from '../database/AppDatabase';
-import { AutoBillModel, AutoBillStatus, AutoCaptureSource, AutoNotificationPayload, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
+import { AutoBillModel, AutoBillStatus, AutoCaptureSource, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
 import { RecordModel, RecordType } from '../model/Record';
 import { RecordRepository } from './RecordRepository';
 
@@ -193,16 +193,6 @@ export class AutoBookkeepingRepository {
     const predicates = new relationalStore.RdbPredicates('t_auto_bill');
     predicates.equalTo('source', source);
     await this.store().delete(predicates);
-  }
-
-  async captureFromNotification(payload: AutoNotificationPayload, parser: (payload: AutoNotificationPayload) => Promise<AutoBillModel | null>): Promise<AutoBillModel | null> {
-    const bill = await parser(payload);
-    if (!bill) {
-      return null;
-    }
-    const id = await this.savePending(bill);
-    bill.id = id;
-    return bill;
   }
 
   private fromRuleResult(result: relationalStore.ResultSet): AutoRuleModel {

@@ -1,10 +1,8 @@
 import { router } from '@kit.ArkUI';
-import { common } from '@kit.AbilityKit';
 import { AppColors, AppRadius, AppSpace, LayoutSizes } from '../constants/DesignSystem';
 import { FeatureFlags } from '../constants/FeatureFlags';
 import { ROUTES } from '../constants/RouteConstants';
 import { AppSettingsData, SettingsRepository, ThemeMode } from '../repository/SettingsRepository';
-import { ReminderService } from '../service/ReminderService';
 import { ThemeUtil } from '../utils/ThemeUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 
@@ -16,27 +14,14 @@ struct Settings {
   @State userName: string = '账本';
   @State themeMode: ThemeMode = ThemeMode.SYSTEM;
   @State currencySymbol: string = '¥';
-  @State reminderEnabled: boolean = false;
-  @State reminderTime: string = '20:00';
-  @State reminderAgentId: number = -1;
   @State autoBookkeepingEnabled: boolean = false;
   @State autoReviewEnabled: boolean = true;
-  @State autoNotificationEnabled: boolean = true;
-  @State autoSmsEnabled: boolean = false;
   @State autoDefaultAccountId: number = 0;
-  @State autoNotificationPromptShown: boolean = false;
   @State alipayBillImportEnabled: boolean = false;
-  private reminderSaveTimer: number = -1;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
 
   aboutToAppear(): void {
     this.loadSettings();
-  }
-
-  aboutToDisappear(): void {
-    if (this.reminderSaveTimer >= 0) {
-      clearTimeout(this.reminderSaveTimer);
-      this.reminderSaveTimer = -1;
-    }
   }
 
   build() {
@@ -48,7 +33,6 @@ struct Settings {
           this.ProfileCard()
           this.ThemeCard()
           this.CurrencyCard()
-          this.ReminderCard()
           if (FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
             this.AlipayImportCard()
           }
@@ -116,7 +100,7 @@ struct Settings {
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.INK)
           .width('100%')
-        Text('主题、货币和提醒')
+        Text('主题、货币和偏好')
           .fontSize(13)
           .fontColor(AppColors.MUTED)
           .width('100%')
@@ -177,52 +161,6 @@ struct Settings {
   }
 
   @Builder
-  private ReminderCard() {
-    Column({ space: 14 }) {
-      this.CardTitle('记账提醒', this.reminderEnabled ? '已开启' : '未开启')
-      Row({ space: 10 }) {
-        Button(this.reminderEnabled ? '关闭提醒' : '开启提醒')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.reminderEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
-          .height(46)
-          .layoutWeight(1)
-          .backgroundColor(this.reminderEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => this.toggleReminder())
-        Button('清理')
-          .height(46)
-          .width(76)
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.EXPENSE)
-          .backgroundColor('#FCE9E4')
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => this.clearReminder())
-        Button(this.reminderTime)
-          .height(46)
-          .width(104)
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.INK)
-          .backgroundColor(AppColors.SURFACE_SOFT)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => this.showReminderTimePicker())
-      }
-      .width('100%')
-      Text('开启后会在每天设定时间发送系统提醒；修改时间会自动更新提醒。')
-        .fontSize(12)
-        .fontColor(AppColors.MUTED)
-        .width('100%')
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor(AppColors.SURFACE)
-    .borderRadius(AppRadius.CARD)
-    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
-  }
-
-  @Builder
   private AlipayImportCard() {
     Column({ space: 14 }) {
       this.CardTitle('支付宝账单导入', this.alipayBillImportEnabled ? '已开启' : '未开启')
@@ -233,7 +171,7 @@ struct Settings {
           .fontColor(this.alipayBillImportEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
           .height(46)
           .layoutWeight(1)
-          .backgroundColor(this.alipayBillImportEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
+          .backgroundColor(this.alipayBillImportEnabled ? AppColors.softDanger() : AppColors.SURFACE_TINT)
           .borderRadius(AppRadius.PILL)
           .onClick(() => {
             this.toggleAlipayImportSetting();
@@ -280,7 +218,7 @@ struct Settings {
           .fontColor(this.autoBookkeepingEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
           .height(46)
           .layoutWeight(1)
-          .backgroundColor(this.autoBookkeepingEnabled ? '#FCE9E4' : AppColors.SURFACE_TINT)
+          .backgroundColor(this.autoBookkeepingEnabled ? AppColors.softDanger() : AppColors.SURFACE_TINT)
           .borderRadius(AppRadius.PILL)
           .onClick(() => {
             this.toggleAutoBookkeepingSetting();
@@ -296,20 +234,6 @@ struct Settings {
           .onClick(() => router.pushUrl({ url: ROUTES.AUTO_BOOKKEEPING }))
       }
       .width('100%')
-      if (FeatureFlags.NOTIFICATION_AUTO_CAPTURE_VISIBLE) {
-        Row({ space: 10 }) {
-          this.AutoChip('先确认', this.autoReviewEnabled, () => {
-            this.toggleAutoReviewSetting();
-          })
-          this.AutoChip('通知', this.autoNotificationEnabled, () => {
-            this.toggleAutoNotificationSetting();
-          })
-          this.AutoChip('短信', this.autoSmsEnabled, () => {
-            this.toggleAutoSmsSetting();
-          })
-        }
-        .width('100%')
-      }
       Text('打开账单详情后手动截图，回到应用选择截图识别。本机 OCR 识别后会先进入待确认账单。')
         .fontSize(12)
         .fontColor(AppColors.MUTED)
@@ -379,7 +303,7 @@ struct Settings {
         .fontColor(AppColors.EXPENSE)
         .height(50)
         .layoutWeight(1)
-        .backgroundColor('#FCE9E4')
+        .backgroundColor(AppColors.softDanger())
         .borderRadius(AppRadius.PILL)
         .onClick(() => this.resetSettings())
     }
@@ -458,120 +382,34 @@ struct Settings {
       this.themeMode = settings.themeMode;
       ThemeUtil.apply(this.themeMode, getContext(this));
       this.currencySymbol = settings.currencySymbol;
-      this.reminderEnabled = settings.reminderEnabled;
-      this.reminderTime = settings.reminderTime;
-      this.reminderAgentId = settings.reminderAgentId;
       this.autoBookkeepingEnabled = settings.autoBookkeepingEnabled;
       this.autoReviewEnabled = settings.autoReviewEnabled;
-      this.autoNotificationEnabled = settings.autoNotificationEnabled;
-      this.autoSmsEnabled = settings.autoSmsEnabled;
       this.autoDefaultAccountId = settings.autoDefaultAccountId;
-      this.autoNotificationPromptShown = settings.autoNotificationPromptShown;
       this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
     } catch (error) {
       ToastUtil.show(ToastUtil.error(error, '设置加载失败'));
     }
   }
 
-  private async saveSettings(updateReminder: boolean = true): Promise<void> {
-    const normalizedTime = this.reminderTime.trim() || '20:00';
-    if (this.reminderEnabled && !ReminderService.parseTime(normalizedTime)) {
-      ToastUtil.show('提醒时间格式应为 HH:mm');
-      return;
-    }
-    if (updateReminder) {
-      try {
-        if (this.reminderEnabled) {
-          this.reminderAgentId = await ReminderService.schedule(
-            getContext(this) as common.UIAbilityContext,
-            normalizedTime,
-            this.reminderAgentId
-          );
-        } else {
-          await ReminderService.cancelAll();
-          this.reminderAgentId = -1;
-        }
-      } catch (error) {
-        this.reminderEnabled = false;
-        this.reminderAgentId = -1;
-        await this.persistSettingsSilently(normalizedTime);
-        ToastUtil.show(ToastUtil.error(error, '提醒开启失败'));
-        return;
-      }
-    }
+  private async saveSettings(showToast: boolean = true): Promise<void> {
     const settings: AppSettingsData = {
       themeMode: this.themeMode,
       currencySymbol: this.currencySymbol.trim() || '¥',
-      reminderEnabled: this.reminderEnabled,
-      reminderTime: normalizedTime,
-      reminderAgentId: this.reminderAgentId,
       autoBookkeepingEnabled: this.autoBookkeepingEnabled,
       autoReviewEnabled: this.autoReviewEnabled,
-      autoNotificationEnabled: this.autoNotificationEnabled,
-      autoSmsEnabled: this.autoSmsEnabled,
       autoDefaultAccountId: this.autoDefaultAccountId,
-      autoNotificationPromptShown: this.autoNotificationPromptShown,
       alipayBillImportEnabled: this.alipayBillImportEnabled
     };
     try {
       await this.repository.saveUserName(getContext(this), this.userName);
       this.userName = this.userName.trim() || '账本';
-      this.reminderTime = normalizedTime;
       await this.repository.save(getContext(this), settings);
-      ToastUtil.show(updateReminder && this.reminderEnabled ? `提醒已设置为 ${normalizedTime}` : '设置已保存');
+      if (showToast) {
+        ToastUtil.show('设置已保存');
+      }
     } catch (error) {
       ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
     }
-  }
-
-  private async toggleReminder(): Promise<void> {
-    if (this.reminderSaveTimer >= 0) {
-      clearTimeout(this.reminderSaveTimer);
-      this.reminderSaveTimer = -1;
-    }
-    this.reminderEnabled = !this.reminderEnabled;
-    await this.saveSettings(true);
-  }
-
-  private async clearReminder(): Promise<void> {
-    try {
-      await ReminderService.cancelAll();
-      this.reminderEnabled = false;
-      this.reminderAgentId = -1;
-      await this.persistSettingsSilently(this.reminderTime.trim() || '20:00');
-      ToastUtil.show('已清理系统提醒');
-    } catch (error) {
-      ToastUtil.show(ToastUtil.error(error, '提醒清理失败'));
-    }
-  }
-
-  private scheduleReminderTimeSave(): void {
-    if (!this.reminderEnabled) {
-      return;
-    }
-    if (this.reminderSaveTimer >= 0) {
-      clearTimeout(this.reminderSaveTimer);
-    }
-    this.reminderSaveTimer = setTimeout(() => {
-      this.reminderSaveTimer = -1;
-      this.saveSettings(true);
-    }, 800);
-  }
-
-  private showReminderTimePicker(): void {
-    const parts = ReminderService.parseTime(this.reminderTime) || [20, 0];
-    const selected = new Date();
-    selected.setHours(parts[0], parts[1], 0, 0);
-    TimePickerDialog.show({
-      selected,
-      useMilitaryTime: true,
-      onAccept: (value: TimePickerResult) => {
-        const hour = `${value.hour}`.padStart(2, '0');
-        const minute = `${value.minute}`.padStart(2, '0');
-        this.reminderTime = `${hour}:${minute}`;
-        this.scheduleReminderTimeSave();
-      }
-    });
   }
 
   private async toggleAlipayImportSetting(): Promise<void> {
@@ -584,24 +422,8 @@ struct Settings {
     await this.saveSettings(false);
   }
 
-  private async toggleAutoReviewSetting(): Promise<void> {
-    this.autoReviewEnabled = !this.autoReviewEnabled;
-    await this.saveSettings(false);
-  }
-
-  private async toggleAutoNotificationSetting(): Promise<void> {
-    this.autoNotificationEnabled = !this.autoNotificationEnabled;
-    await this.saveSettings(false);
-  }
-
-  private async toggleAutoSmsSetting(): Promise<void> {
-    this.autoSmsEnabled = !this.autoSmsEnabled;
-    await this.saveSettings(false);
-  }
-
   private async resetSettings(): Promise<void> {
     try {
-      await ReminderService.cancelAll();
       await this.repository.reset(getContext(this));
       await this.loadSettings();
       ThemeUtil.apply(this.themeMode, getContext(this));
@@ -621,21 +443,4 @@ struct Settings {
     return '跟随系统';
   }
 
-  private async persistSettingsSilently(normalizedTime: string): Promise<void> {
-    const settings: AppSettingsData = {
-      themeMode: this.themeMode,
-      currencySymbol: this.currencySymbol.trim() || '¥',
-      reminderEnabled: this.reminderEnabled,
-      reminderTime: normalizedTime,
-      reminderAgentId: this.reminderAgentId,
-      autoBookkeepingEnabled: this.autoBookkeepingEnabled,
-      autoReviewEnabled: this.autoReviewEnabled,
-      autoNotificationEnabled: this.autoNotificationEnabled,
-      autoSmsEnabled: this.autoSmsEnabled,
-      autoDefaultAccountId: this.autoDefaultAccountId,
-      autoNotificationPromptShown: this.autoNotificationPromptShown,
-      alipayBillImportEnabled: this.alipayBillImportEnabled
-    };
-    await this.repository.save(getContext(this), settings);
-  }
 }

@@ -1,5 +1,4 @@
 import { router } from '@kit.ArkUI';
-import { common } from '@kit.AbilityKit';
 import { AppState } from '../viewmodel/AppState';
 import { AccountModel } from '../model/Account';
 import { BudgetModel } from '../model/Budget';
@@ -43,9 +42,7 @@ struct Index {
   @State monthBudgetRemaining: number = 0;
   @State monthBudgetProgress: number = 0;
   @State pendingAutoBillCount: number = 0;
-  @State privacyChecked: boolean = false;
-  @State privacyAccepted: boolean = false;
-  @State privacyAgreeChecked: boolean = false;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
   private clockTimer: number = -1;
 
   aboutToAppear(): void {
@@ -56,14 +53,12 @@ struct Index {
     this.clockTimer = setInterval(() => {
       this.nowTime = Date.now();
     }, 60000);
-    this.checkPrivacy();
+    this.refresh();
   }
 
   onPageShow(): void {
-    if (this.privacyAccepted) {
-      this.statisticsRefreshKey++;
-      this.refresh();
-    }
+    this.statisticsRefreshKey++;
+    this.refresh();
   }
 
   aboutToDisappear(): void {
@@ -74,158 +69,39 @@ struct Index {
   }
 
   build() {
-    if (!this.privacyChecked) {
-      this.PrivacyLoading()
-    } else if (!this.privacyAccepted) {
-      this.PrivacyGate()
-    } else {
-      Tabs({ barPosition: BarPosition.End }) {
-        TabContent() {
-          this.HomeTab()
-        }
-        .tabBar(this.TabBarItem('明细', 0))
-
-        TabContent() {
-          this.StatisticsTab()
-        }
-        .tabBar(this.TabBarItem('统计', 1))
-
-        TabContent() {
-          this.AssetsTab()
-        }
-        .tabBar(this.TabBarItem('资产', 2))
-
-        TabContent() {
-          this.ProfileTab()
-        }
-        .tabBar(this.TabBarItem('我的', 3))
+    Tabs({ barPosition: BarPosition.End }) {
+      TabContent() {
+        this.HomeTab()
       }
-      .barHeight(62)
-      .backgroundColor(AppColors.CANVAS)
-      .onChange((index: number) => {
-        this.currentTab = index;
-        if (index === 1) {
-          this.statisticsRefreshKey++;
-        }
-        this.refresh();
-      })
-      .onAreaChange((oldValue, newValue) => {
-        this.viewportWidth = parseFloat(`${newValue.width}`);
-      })
-    }
-  }
+      .tabBar(this.TabBarItem('明细', 0))
 
-  @Builder
-  private PrivacyLoading() {
-    Column({ space: 10 }) {
-      Text('一页账')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.INK)
-      Text('正在准备账本')
-        .fontSize(13)
-        .fontColor(AppColors.MUTED)
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .backgroundColor(AppColors.CANVAS)
-  }
-
-  @Builder
-  private PrivacyGate() {
-    Column() {
-      Scroll() {
-        Column({ space: 18 }) {
-          Text('一页账')
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.INK)
-            .width('100%')
-          Text('使用前请阅读并同意隐私政策与用户协议。')
-            .fontSize(14)
-            .fontColor(AppColors.MUTED)
-            .lineHeight(22)
-            .width('100%')
-
-          Column({ space: 12 }) {
-            this.PrivacyText('数据用途', '用于记录收支、分类统计、预算进度、账户余额和账单导出。')
-            this.PrivacyText('权限说明', '默认只申请记账提醒所需权限；导出文件时由系统文件选择器让你选择保存位置。')
-            this.PrivacyText('自动识别', FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? '开启后仅在本机解析通知文本，识别结果先进入待确认账单。' : '当前版本未开启通知自动识别，不会申请短信或通知监听权限。')
-            this.PrivacyText('数据管理', '你可以在设置和数据导出页面管理偏好、导出账单，卸载应用会清除应用沙箱内数据。')
-          }
-          .width('100%')
-          .padding(16)
-          .backgroundColor(AppColors.SURFACE)
-          .borderRadius(AppRadius.CARD)
-          .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
-
-          Row({ space: 10 }) {
-            Checkbox()
-              .select(this.privacyAgreeChecked)
-              .onChange((value: boolean) => {
-                this.privacyAgreeChecked = value;
-              })
-            Text('我已阅读并同意隐私政策与用户协议')
-              .fontSize(14)
-              .fontColor(AppColors.INK)
-              .layoutWeight(1)
-              .maxLines(2)
-          }
-          .width('100%')
-          .padding(14)
-          .backgroundColor(AppColors.SURFACE)
-          .borderRadius(AppRadius.CARD)
-
-          Button('同意并进入')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.SURFACE)
-            .height(50)
-            .width('100%')
-            .backgroundColor(this.privacyAgreeChecked ? AppColors.CHART_BLUE : AppColors.FAINT)
-            .borderRadius(AppRadius.PILL)
-            .onClick(() => this.acceptPrivacy())
-
-          Button('不同意并退出')
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.MUTED)
-            .height(46)
-            .width('100%')
-            .backgroundColor(AppColors.SURFACE_SOFT)
-            .borderRadius(AppRadius.PILL)
-            .onClick(() => this.exitApp())
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: LayoutSizes.CONTENT_COMPACT })
-        .alignSelf(ItemAlign.Center)
-        .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 72, bottom: 32 })
+      TabContent() {
+        this.StatisticsTab()
       }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.CANVAS)
-  }
+      .tabBar(this.TabBarItem('统计', 1))
 
-  @Builder
-  private PrivacyText(title: string, content: string) {
-    Column({ space: 4 }) {
-      Text(title)
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.INK)
-        .width('100%')
-      Text(content)
-        .fontSize(13)
-        .fontColor(AppColors.MUTED)
-        .lineHeight(20)
-        .width('100%')
+      TabContent() {
+        this.AssetsTab()
+      }
+      .tabBar(this.TabBarItem('资产', 2))
+
+      TabContent() {
+        this.ProfileTab()
+      }
+      .tabBar(this.TabBarItem('我的', 3))
     }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
+    .barHeight(62)
+    .backgroundColor(AppColors.CANVAS)
+    .onChange((index: number) => {
+      this.currentTab = index;
+      if (index === 1) {
+        this.statisticsRefreshKey++;
+      }
+      this.refresh();
+    })
+    .onAreaChange((oldValue, newValue) => {
+      this.viewportWidth = parseFloat(`${newValue.width}`);
+    })
   }
 
   @Builder
@@ -304,7 +180,7 @@ struct Index {
         .height(this.isPhone() ? 44 : 52)
         .textAlign(TextAlign.Center)
         .borderRadius(this.isPhone() ? 22 : 26)
-        .backgroundColor('#EAF4FF')
+        .backgroundColor(AppColors.softBlue())
         .border({ width: 5, color: AppColors.SURFACE })
         .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
         .onClick(() => router.pushUrl({ url: ROUTES.SEARCH }))
@@ -325,7 +201,7 @@ struct Index {
             .height(this.isPhone() ? 40 : 50)
             .textAlign(TextAlign.Center)
             .borderRadius(this.isPhone() ? 20 : 25)
-            .backgroundColor('#FFEAF0')
+            .backgroundColor(AppColors.softPink())
       Text('今日账本')
             .fontSize(this.isPhone() ? 18 : 21)
             .fontWeight(FontWeight.Bold)
@@ -393,7 +269,7 @@ struct Index {
           .height(this.isPhone() ? 26 : 30)
           .textAlign(TextAlign.Center)
           .borderRadius(this.isPhone() ? 13 : 15)
-          .backgroundColor(this.todayBalance >= 0 ? '#E6F7EF' : '#FFEAF0')
+          .backgroundColor(this.todayBalance >= 0 ? AppColors.softGreen() : AppColors.softPink())
       }
       .width('100%')
 
@@ -409,7 +285,7 @@ struct Index {
         Column()
           .height(10)
           .width('100%')
-          .backgroundColor('#EAF0F6')
+          .backgroundColor(AppColors.TRACK)
           .borderRadius(5)
         Column()
           .height(10)
@@ -430,7 +306,7 @@ struct Index {
     .width(this.isDesktop() ? 180 : this.isPhone() ? 134 : '100%')
     .height(this.isDesktop() ? 146 : this.isPhone() ? 122 : 126)
     .padding(this.isPhone() ? 10 : 16)
-    .backgroundColor('#F7FBFF')
+    .backgroundColor(AppColors.PANEL)
     .borderRadius(28)
   }
 
@@ -438,39 +314,39 @@ struct Index {
   private TodaySupportStrip() {
     if (this.isPhone()) {
       Row({ space: 8 }) {
-        this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, '#FFF4DE', ROUTES.BUDGET_SETTING)
+        this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
         if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
           this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
         } else {
-          this.SupportPill('本月支出', () => NumberUtil.money(this.monthExpense), AppColors.CHART_PINK, '#FFEAF0', ROUTES.STATISTICS)
+          this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
         }
-        this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, '#E6F7EF', ROUTES.SEARCH)
+        this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.SEARCH)
       }
       .width('100%')
     } else if (this.isDesktop()) {
       Row({ space: 12 }) {
-        this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, '#FFF4DE', ROUTES.BUDGET_SETTING)
+        this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
         if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
           this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
         } else {
-          this.SupportPill('本月支出', () => NumberUtil.money(this.monthExpense), AppColors.CHART_PINK, '#FFEAF0', ROUTES.STATISTICS)
+          this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
         }
-        this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, '#E6F7EF', ROUTES.SEARCH)
+        this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.SEARCH)
       }
       .width('100%')
     } else {
       Column({ space: 10 }) {
         Row({ space: 10 }) {
-          this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, '#FFF4DE', ROUTES.BUDGET_SETTING)
+          this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
           if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
             this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
           } else {
-            this.SupportPill('结余', () => NumberUtil.money(this.monthBalance), AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.STATISTICS)
+            this.SupportPill('结余', () => NumberUtil.compactMoney(this.monthBalance), AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.STATISTICS)
           }
         }
         Row({ space: 10 }) {
-          this.SupportPill('本月支出', () => NumberUtil.money(this.monthExpense), AppColors.CHART_PINK, '#FFEAF0', ROUTES.STATISTICS)
-          this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, '#E6F7EF', ROUTES.SEARCH)
+          this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
+          this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.SEARCH)
         }
       }
       .width('100%')
@@ -490,6 +366,9 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(color)
           .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+          .textAlign(TextAlign.Center)
       }
       .layoutWeight(1)
       .height(44)
@@ -507,6 +386,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(color)
           .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .height(42)
@@ -521,23 +401,23 @@ struct Index {
   private StatusMetricGrid() {
     if (this.isDesktop()) {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-        this.StatusMetric('收入', () => NumberUtil.compactMoney(this.todayIncome), '收', AppColors.CHART_GREEN, '#E6F7EF')
-        this.StatusMetric('支出', () => NumberUtil.compactMoney(this.todayExpense), '支', AppColors.CHART_PINK, '#FFEAF0')
-        this.StatusMetric('结余', () => NumberUtil.compactMoney(this.todayBalance), '余', AppColors.CHART_BLUE, '#EAF4FF')
-        this.StatusMetric('记录', () => `${this.todayRecordCount} 笔`, '笔', AppColors.CHART_CYAN, '#E5F8F6')
+        this.StatusMetric('收入', () => NumberUtil.compactMoney(this.todayIncome), '收', AppColors.CHART_GREEN, AppColors.softGreen())
+        this.StatusMetric('支出', () => NumberUtil.compactMoney(this.todayExpense), '支', AppColors.CHART_PINK, AppColors.softPink())
+        this.StatusMetric('结余', () => NumberUtil.compactMoney(this.todayBalance), '余', AppColors.CHART_BLUE, AppColors.softBlue())
+        this.StatusMetric('记录', () => `${this.todayRecordCount} 笔`, '笔', AppColors.CHART_CYAN, AppColors.softCyan())
       }
       .width('100%')
       .layoutWeight(1)
     } else {
       Column({ space: 8 }) {
         Row({ space: 8 }) {
-          this.StatusMetric('收入', () => NumberUtil.compactMoney(this.todayIncome), '收', AppColors.CHART_GREEN, '#E6F7EF')
-          this.StatusMetric('支出', () => NumberUtil.compactMoney(this.todayExpense), '支', AppColors.CHART_PINK, '#FFEAF0')
+          this.StatusMetric('收入', () => NumberUtil.compactMoney(this.todayIncome), '收', AppColors.CHART_GREEN, AppColors.softGreen())
+          this.StatusMetric('支出', () => NumberUtil.compactMoney(this.todayExpense), '支', AppColors.CHART_PINK, AppColors.softPink())
         }
         .width('100%')
         Row({ space: 8 }) {
-          this.StatusMetric('结余', () => NumberUtil.compactMoney(this.todayBalance), '余', AppColors.CHART_BLUE, '#EAF4FF')
-          this.StatusMetric('记录', () => `${this.todayRecordCount} 笔`, '笔', AppColors.CHART_CYAN, '#E5F8F6')
+          this.StatusMetric('结余', () => NumberUtil.compactMoney(this.todayBalance), '余', AppColors.CHART_BLUE, AppColors.softBlue())
+          this.StatusMetric('记录', () => `${this.todayRecordCount} 笔`, '笔', AppColors.CHART_CYAN, AppColors.softCyan())
         }
         .width('100%')
       }
@@ -635,7 +515,7 @@ struct Index {
             .height(this.isPhone() ? 42 : 50)
             .textAlign(TextAlign.Center)
             .borderRadius(this.isPhone() ? 21 : 25)
-            .backgroundColor('#FFF4DE')
+            .backgroundColor(AppColors.softYellow())
           Text(this.monthBudget > 0 ? '本月预算' : '本月支出')
             .fontSize(this.isPhone() ? 18 : 22)
             .fontWeight(FontWeight.Bold)
@@ -658,11 +538,12 @@ struct Index {
           Text(this.monthBudget > 0 ? '已用预算' : '本月已花')
             .fontSize(13)
             .fontColor(AppColors.MUTED)
-          Text(NumberUtil.money(this.monthExpense))
+          Text(NumberUtil.compactMoney(this.monthExpense))
             .fontSize(this.isPhone() ? 30 : this.isWide() ? 38 : 34)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppColors.INK)
             .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text(this.budgetHintText())
             .fontSize(13)
             .fontColor(AppColors.MUTED)
@@ -674,10 +555,13 @@ struct Index {
           Text(this.monthBudget > 0 ? '预算剩余' : '本月结余')
             .fontSize(13)
             .fontColor(AppColors.MUTED)
-          Text(this.monthBudget > 0 ? NumberUtil.money(this.monthBudgetRemaining) : NumberUtil.money(this.monthBalance))
+          Text(this.monthBudget > 0 ? NumberUtil.compactMoney(this.monthBudgetRemaining) : NumberUtil.compactMoney(this.monthBalance))
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.monthBudget > 0 ? this.budgetStatusColor() : this.monthBalance >= 0 ? AppColors.CHART_GREEN : AppColors.EXPENSE)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
           Text(`${this.homeProgress()}%`)
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
@@ -692,7 +576,7 @@ struct Index {
         Column()
           .height(8)
           .width('100%')
-          .backgroundColor('#EEF3F8')
+          .backgroundColor(AppColors.TRACK)
           .borderRadius(4)
         Column()
           .height(8)
@@ -710,7 +594,7 @@ struct Index {
           .fontColor(AppColors.WARNING)
           .height(42)
           .width('100%')
-          .backgroundColor('#FFF4DE')
+          .backgroundColor(AppColors.softYellow())
           .borderRadius(AppRadius.PILL)
           .onClick(() => router.pushUrl({ url: ROUTES.BUDGET_SETTING }))
       }
@@ -725,10 +609,10 @@ struct Index {
   @Builder
   private ActionPanel() {
     Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-      this.QuickAction('记一笔', '新增收支', '＋', AppColors.CHART_BLUE, '#EAF4FF', ROUTES.RECORD_EDIT)
-      this.QuickAction('日历', '每日收支', '日', AppColors.LILAC, '#EEEAFE', ROUTES.CALENDAR)
-      this.QuickAction('预算', '月度进度', '％', AppColors.WARNING, '#FFF4DE', ROUTES.BUDGET_SETTING)
-      this.QuickAction('导出', '生成报表', '↓', AppColors.CHART_GREEN, '#E6F7EF', ROUTES.DATA_EXPORT)
+      this.QuickAction('记一笔', '新增收支', '＋', AppColors.CHART_BLUE, AppColors.softBlue(), ROUTES.RECORD_EDIT)
+      this.QuickAction('日历', '每日收支', '日', AppColors.LILAC, AppColors.softPurple(), ROUTES.CALENDAR)
+      this.QuickAction('预算', '月度进度', '％', AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
+      this.QuickAction('导出', '生成报表', '↓', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.DATA_EXPORT)
     }
     .width('100%')
   }
@@ -885,11 +769,12 @@ struct Index {
             Text('净资产')
               .fontSize(13)
               .fontColor(AppColors.MUTED)
-            Text(NumberUtil.money(this.appState.totalAssets))
+            Text(NumberUtil.compactMoney(this.appState.totalAssets))
               .fontSize(34)
               .fontWeight(FontWeight.Bold)
               .fontColor(AppColors.INK)
               .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .alignItems(HorizontalAlign.Start)
         }
@@ -944,11 +829,13 @@ struct Index {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      Text(NumberUtil.money(account.balance))
+      Text(NumberUtil.compactMoney(account.balance))
         .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor(account.isLiability ? AppColors.EXPENSE : AppColors.INK)
         .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .constraintSize({ maxWidth: 118 })
     }
     .height(this.isPhone() ? 70 : 78)
     .width(this.isWide() ? '48%' : '100%')
@@ -1022,13 +909,13 @@ struct Index {
   private ProfileGrid() {
     Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
       this.ProfileShortcut('分类管理', '调整常用分类', '类', AppColors.LEDGER, AppColors.SURFACE_TINT, ROUTES.CATEGORY_MANAGE)
-      this.ProfileShortcut('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, '#E5F8F6', ROUTES.ACCOUNT_MANAGE)
-      this.ProfileShortcut('预算管理', '控制月度支出', '预', AppColors.WARNING, '#FFF5DF', ROUTES.BUDGET_SETTING)
+      this.ProfileShortcut('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, AppColors.softCyan(), ROUTES.ACCOUNT_MANAGE)
+      this.ProfileShortcut('预算管理', '控制月度支出', '预', AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
       if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-        this.ProfileShortcut('自动记账', this.pendingAutoBillCount > 0 ? `${this.pendingAutoBillCount} 条待确认` : '审核识别账单', '识', AppColors.CHART_BLUE, '#EAF4FF', ROUTES.AUTO_BOOKKEEPING)
+        this.ProfileShortcut('自动记账', this.pendingAutoBillCount > 0 ? `${this.pendingAutoBillCount} 条待确认` : '审核识别账单', '识', AppColors.CHART_BLUE, AppColors.softBlue(), ROUTES.AUTO_BOOKKEEPING)
       }
-      this.ProfileShortcut('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, '#E6F6F0', ROUTES.DATA_EXPORT)
-      this.ProfileShortcut('设置', '主题与提醒', '设', AppColors.LILAC, '#EEEAFE', ROUTES.SETTINGS)
+      this.ProfileShortcut('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, AppColors.softGreen(), ROUTES.DATA_EXPORT)
+      this.ProfileShortcut('设置', '主题与偏好', '设', AppColors.LILAC, AppColors.softPurple(), ROUTES.SETTINGS)
       this.ProfileShortcut('关于', '版本与说明', '关', AppColors.MUTED, AppColors.SURFACE_SOFT, ROUTES.ABOUT)
     }
     .width('100%')
@@ -1170,9 +1057,9 @@ struct Index {
 
   private budgetHintText(): string {
     if (this.monthBudget <= 0) {
-      return `收入 ${NumberUtil.money(this.monthIncome)}`;
+      return `收入 ${NumberUtil.compactMoney(this.monthIncome)}`;
     }
-    return `预算 ${NumberUtil.money(this.monthBudget)} · 已用 ${this.monthBudgetProgress}%`;
+    return `预算 ${NumberUtil.compactMoney(this.monthBudget)} · 已用 ${this.monthBudgetProgress}%`;
   }
 
   private budgetStatusText(): string {
@@ -1203,9 +1090,9 @@ struct Index {
 
   private budgetStatusBgColor(): string {
     if (this.monthBudget <= 0 || this.monthBudgetProgress >= 80) {
-      return '#FFF4DE';
+      return AppColors.softYellow();
     }
-    return '#E6F7EF';
+    return AppColors.softGreen();
   }
 
   private todayExpenseShare(): number {
@@ -1251,32 +1138,6 @@ struct Index {
       return '下午好';
     }
     return '晚上好';
-  }
-
-  private async checkPrivacy(): Promise<void> {
-    try {
-      this.privacyAccepted = await this.settingsRepository.loadPrivacyAccepted(getContext(this));
-    } catch (error) {
-      this.privacyAccepted = false;
-    }
-    this.privacyChecked = true;
-    if (this.privacyAccepted) {
-      await this.refresh();
-    }
-  }
-
-  private async acceptPrivacy(): Promise<void> {
-    if (!this.privacyAgreeChecked) {
-      return;
-    }
-    await this.settingsRepository.savePrivacyAccepted(getContext(this), true);
-    this.privacyAccepted = true;
-    await this.refresh();
-  }
-
-  private exitApp(): void {
-    const context = getContext(this) as common.UIAbilityContext;
-    context.terminateSelf();
   }
 
   private async refresh(): Promise<void> {

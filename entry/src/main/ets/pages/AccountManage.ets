@@ -120,24 +120,24 @@ struct AccountManage {
 
       Row({ space: 10 }) {
         TextInput({ text: this.balanceText, placeholder: '当前余额' })
-          .type(InputType.Number)
+          .type(InputType.NUMBER_DECIMAL)
           .height(50)
           .layoutWeight(1)
           .backgroundColor(AppColors.SURFACE_SOFT)
           .borderRadius(16)
           .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
-            this.balanceText = value;
+            this.balanceText = this.normalizeAmount(value);
           })
         TextInput({ text: this.initialText, placeholder: '初始余额' })
-          .type(InputType.Number)
+          .type(InputType.NUMBER_DECIMAL)
           .height(50)
           .layoutWeight(1)
           .backgroundColor(AppColors.SURFACE_SOFT)
           .borderRadius(16)
           .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
-            this.initialText = value;
+            this.initialText = this.normalizeAmount(value);
           })
       }
       .width('100%')
@@ -289,10 +289,13 @@ struct AccountManage {
       .layoutWeight(1)
 
       Column({ space: 5 }) {
-        Text(NumberUtil.money(item.balance))
+        Text(NumberUtil.compactMoney(item.balance))
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor(item.isLiability ? AppColors.EXPENSE : AppColors.INK)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: 118 })
         Row({ space: 6 }) {
           Button('✎')
             .fontSize(13)
@@ -405,6 +408,15 @@ struct AccountManage {
     this.colorText = '#2F7EF7';
     this.isLiability = false;
     this.sortText = `${this.nextSortOrder()}`;
+  }
+
+  private normalizeAmount(value: string): string {
+    const cleaned = value.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return cleaned;
+    }
+    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
   }
 
   private nextSortOrder(): number {

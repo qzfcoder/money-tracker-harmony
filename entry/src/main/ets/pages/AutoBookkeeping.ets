@@ -1,7 +1,5 @@
-import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
-import { FeatureFlags } from '../constants/FeatureFlags';
 import { CategoryModel } from '../model/Category';
 import { AccountModel } from '../model/Account';
 import { AutoBillModel, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
@@ -45,16 +43,9 @@ struct AutoBookkeeping {
 
   @State themeMode: ThemeMode = ThemeMode.SYSTEM;
   @State currencySymbol: string = '¥';
-  @State reminderEnabled: boolean = false;
-  @State reminderTime: string = '20:00';
-  @State reminderAgentId: number = -1;
   @State autoEnabled: boolean = false;
   @State reviewEnabled: boolean = true;
-  @State notificationEnabled: boolean = true;
-  @State smsEnabled: boolean = false;
   @State defaultAccountId: number = 0;
-  @State notificationPromptShown: boolean = false;
-  @State notificationGranted: boolean = false;
   @State alipayBillImportEnabled: boolean = false;
 
   @State ruleType: AutoRuleType = AutoRuleType.CATEGORY;
@@ -107,7 +98,7 @@ struct AutoBookkeeping {
             this.RuleListCard()
           } else {
             this.SourceSettingsCard()
-            this.PrivacyCard()
+            this.DataCacheCard()
           }
         }
         .width('100%')
@@ -379,7 +370,7 @@ struct AutoBookkeeping {
       }
       .width('100%')
       this.ActionButton('从相册选择截图', AppColors.CHART_BLUE, AppColors.SURFACE_TINT, () => this.pickAndRecognize())
-      Text('不会后台截图，也不会读取支付宝数据；只有你主动选择截图后，才会在本机 OCR 识别。')
+      Text('不会自动截屏，也不会读取支付宝数据；只有你主动选择截图后，才会在本机 OCR 识别。')
         .fontSize(12)
         .fontColor(AppColors.MUTED)
         .lineHeight(20)
@@ -526,7 +517,7 @@ struct AutoBookkeeping {
       .borderRadius(AppRadius.PILL)
 
       TextInput({ text: this.editingAmountText, placeholder: '金额' })
-        .type(InputType.Number)
+        .type(InputType.NUMBER_DECIMAL)
         .fontSize(20)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.INK)
@@ -655,26 +646,6 @@ struct AutoBookkeeping {
         this.reviewEnabled = !this.reviewEnabled;
         this.saveSettings();
       })
-      if (FeatureFlags.NOTIFICATION_AUTO_CAPTURE_VISIBLE) {
-        this.ToggleRow('监听交易推送通知', '微信、支付宝、银行 APP 通知会走本地解析。', this.notificationEnabled, () => {
-          this.notificationEnabled = !this.notificationEnabled;
-          this.saveSettings();
-        })
-        this.ToggleRow('短信来源识别', '默认关闭；需要真机短信权限适配后再开启。', this.smsEnabled, () => {
-          this.smsEnabled = !this.smsEnabled;
-          this.saveSettings();
-        })
-        Button(this.notificationGranted ? '通知订阅已授权' : '打开通知订阅授权')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.SURFACE)
-          .height(48)
-          .width('100%')
-          .backgroundColor(AppColors.CHART_BLUE)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => this.openNotificationSettings())
-      }
-
       Text('发布版采用用户主动触发：手动选择账单截图后，本机 OCR 识别结果先进入待确认。')
         .fontSize(12)
         .fontColor(AppColors.MUTED)
@@ -689,9 +660,9 @@ struct AutoBookkeeping {
   }
 
   @Builder
-  private PrivacyCard() {
+  private DataCacheCard() {
     Column({ space: 12 }) {
-      this.CardTitle('隐私与缓存', '本机处理')
+      this.CardTitle('数据缓存', '本机处理')
       Text('截图 OCR 和粘贴文本只用于本机规则匹配和待确认账单生成，不上传服务器。确认入账后会清除该条待确认缓存；你也可以一键清空全部自动识别缓存。')
         .fontSize(13)
         .fontColor(AppColors.MUTED)
@@ -973,8 +944,6 @@ struct AutoBookkeeping {
       this.rules = await service.listRules();
       this.pendingBills = await service.listPending(50, 0);
       this.pickFirstCategory();
-      await this.refreshNotificationGrant();
-      await this.showNotificationPrimerIfNeeded();
       await AppState.getInstance().refreshPendingAutoBills();
     } catch (error) {
       ToastUtil.show('自动记账数据加载失败，请重试');
@@ -984,15 +953,9 @@ struct AutoBookkeeping {
   private syncSettings(settings: AppSettingsData): void {
     this.themeMode = settings.themeMode;
     this.currencySymbol = settings.currencySymbol;
-    this.reminderEnabled = settings.reminderEnabled;
-    this.reminderTime = settings.reminderTime;
-    this.reminderAgentId = settings.reminderAgentId;
     this.autoEnabled = settings.autoBookkeepingEnabled;
     this.reviewEnabled = settings.autoReviewEnabled;
-    this.notificationEnabled = settings.autoNotificationEnabled;
-    this.smsEnabled = settings.autoSmsEnabled;
     this.defaultAccountId = settings.autoDefaultAccountId;
-    this.notificationPromptShown = settings.autoNotificationPromptShown;
     this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
   }
 
@@ -1000,77 +963,18 @@ struct AutoBookkeeping {
     const settings: AppSettingsData = {
       themeMode: this.themeMode,
       currencySymbol: this.currencySymbol,
-      reminderEnabled: this.reminderEnabled,
-      reminderTime: this.reminderTime,
-      reminderAgentId: this.reminderAgentId,
       autoBookkeepingEnabled: this.autoEnabled,
       autoReviewEnabled: this.reviewEnabled,
-      autoNotificationEnabled: this.notificationEnabled,
-      autoSmsEnabled: this.smsEnabled,
       autoDefaultAccountId: this.defaultAccountId,
-      autoNotificationPromptShown: this.notificationPromptShown,
       alipayBillImportEnabled: this.alipayBillImportEnabled
     };
     await this.settingsRepository.save(getContext(this), settings);
     ToastUtil.show('自动记账设置已保存');
   }
 
-  private async showNotificationPrimerIfNeeded(): Promise<void> {
-    if (!FeatureFlags.NOTIFICATION_AUTO_CAPTURE_VISIBLE) {
-      return;
-    }
-    if (!this.autoEnabled || !this.notificationEnabled || this.notificationPromptShown || this.notificationGranted) {
-      return;
-    }
-    this.notificationPromptShown = true;
-    await this.saveSettingsSilently();
-    AlertDialog.show({
-      title: '开启交易通知识别',
-      message: '授权后仅解析你收到的交易通知文本，识别结果先进入待确认账单，确认后才入账。',
-      primaryButton: {
-        value: '去开启',
-        action: () => {
-          this.enableNotificationCapture();
-        }
-      },
-      secondaryButton: {
-        value: '稍后',
-        action: () => {
-          ToastUtil.show('可在自动记账设置中重新开启');
-        }
-      }
-    });
-  }
-
-  private async saveSettingsSilently(): Promise<void> {
-    const settings: AppSettingsData = {
-      themeMode: this.themeMode,
-      currencySymbol: this.currencySymbol,
-      reminderEnabled: this.reminderEnabled,
-      reminderTime: this.reminderTime,
-      reminderAgentId: this.reminderAgentId,
-      autoBookkeepingEnabled: this.autoEnabled,
-      autoReviewEnabled: this.reviewEnabled,
-      autoNotificationEnabled: this.notificationEnabled,
-      autoSmsEnabled: this.smsEnabled,
-      autoDefaultAccountId: this.defaultAccountId,
-      autoNotificationPromptShown: this.notificationPromptShown,
-      alipayBillImportEnabled: this.alipayBillImportEnabled
-    };
-    await this.settingsRepository.save(getContext(this), settings);
-  }
-
-  private async enableNotificationCapture(): Promise<void> {
-    this.autoEnabled = true;
-    this.reviewEnabled = true;
-    this.notificationEnabled = true;
-    await this.saveSettingsSilently();
-    await this.openNotificationSettings();
-  }
-
   private async previewText(): Promise<void> {
     if (this.testText.trim().length === 0) {
-      ToastUtil.show('先粘贴一条通知内容');
+      ToastUtil.show('先粘贴一条账单文字');
       return;
     }
     const result = await AutoBookkeepingService.create(getContext(this)).preview(this.testText);
@@ -1083,7 +987,7 @@ struct AutoBookkeeping {
 
   private async captureText(): Promise<void> {
     if (this.testText.trim().length === 0) {
-      ToastUtil.show('先粘贴一条通知内容');
+      ToastUtil.show('先粘贴一条账单文字');
       return;
     }
     const result = await AutoBookkeepingService.create(getContext(this)).captureManualText(this.testText);
@@ -1286,14 +1190,6 @@ struct AutoBookkeeping {
     ToastUtil.show('规则已删除');
   }
 
-  private async openNotificationSettings(): Promise<void> {
-    ToastUtil.show('当前发布版未开启通知订阅功能');
-  }
-
-  private async refreshNotificationGrant(): Promise<void> {
-    this.notificationGranted = false;
-  }
-
   private readLaunchParams(): void {
     const params = router.getParams() as AutoBookkeepingParams;
     const action = `${params?.launchAction || ''}`;
@@ -1385,27 +1281,11 @@ struct AutoBookkeeping {
   }
 
   private sourceLabel(source: string): string {
-    if (source === 'notification') {
-      return '通知';
-    }
-    if (source === 'sms') {
-      return '短信';
-    }
     return '手动';
   }
 
   private sourceSummary(): string {
-    if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-      return '截图 OCR';
-    }
-    const list: string[] = [];
-    if (this.notificationEnabled) {
-      list.push('通知');
-    }
-    if (this.smsEnabled) {
-      list.push('短信');
-    }
-    return list.length > 0 ? list.join(' / ') : '未开启';
+    return '截图 OCR';
   }
 
   private isWide(): boolean {

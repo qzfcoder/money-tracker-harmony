@@ -6,7 +6,6 @@ import { RecordRepository } from '../repository/RecordRepository';
 import { CategoryModel } from '../model/Category';
 import { BudgetModel } from '../model/Budget';
 import { RecordType } from '../model/Record';
-import { CategoryExpenseRank } from '../repository/RecordRepository';
 import { AppState } from '../viewmodel/AppState';
 import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
@@ -31,9 +30,14 @@ struct BudgetSetting {
   @State viewportWidth: number = 0;
   @State anchorTime: number = Date.now();
   @State totalBudgetText: string = '0';
+  @State totalBudgetValue: number = 0;
+  @State categoryBudgetTotal: number = 0;
   @State rows: BudgetRow[] = [];
   @State spentTotal: number = 0;
+  @State remainingTotalValue: number = 0;
+  @State totalProgressValue: number = 0;
   @State loading: boolean = false;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
 
   aboutToAppear(): void {
     this.loadMonthData();
@@ -108,7 +112,7 @@ struct BudgetSetting {
         .fontColor(AppColors.CHART_BLUE)
         .width(42)
         .height(38)
-        .backgroundColor('#EAF4FF')
+        .backgroundColor(AppColors.softBlue())
         .borderRadius(19)
         .onClick(() => {
           this.anchorTime = new Date(new Date(this.anchorTime).getFullYear(), new Date(this.anchorTime).getMonth() - 1, 1).getTime();
@@ -127,7 +131,7 @@ struct BudgetSetting {
         .fontColor(AppColors.CHART_BLUE)
         .width(42)
         .height(38)
-        .backgroundColor('#EAF4FF')
+        .backgroundColor(AppColors.softBlue())
         .borderRadius(19)
         .onClick(() => {
           this.anchorTime = new Date(new Date(this.anchorTime).getFullYear(), new Date(this.anchorTime).getMonth() + 1, 1).getTime();
@@ -140,7 +144,7 @@ struct BudgetSetting {
   @Builder
   private TotalCard() {
     Column({ space: 16 }) {
-      Row() {
+      Row({ space: 8 }) {
         Column({ space: 4 }) {
           Text('月度总预算')
             .fontSize(13)
@@ -153,7 +157,9 @@ struct BudgetSetting {
             .borderRadius(18)
             .padding({ left: 16, right: 16 })
             .onChange((value: string) => {
-              this.totalBudgetText = value;
+              this.totalBudgetText = this.normalizeAmount(value);
+              this.totalBudgetValue = this.parseAmount(this.totalBudgetText);
+              this.refreshBudgetStats();
             })
         }
         .layoutWeight(1)
@@ -161,9 +167,65 @@ struct BudgetSetting {
       .width('100%')
 
       Row() {
-        this.InfoChip('已用', NumberUtil.money(this.spentTotal), AppColors.EXPENSE, '#FCE9E4')
-        this.InfoChip('剩余', NumberUtil.money(this.remainingTotal()), AppColors.CHART_GREEN, '#E6F7EF')
-        this.InfoChip('进度', `${this.totalProgress()}%`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+        Column({ space: 4 }) {
+          Text('已用')
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+          Text(NumberUtil.compactMoney(this.spentTotal))
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.EXPENSE)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .textAlign(TextAlign.Center)
+        }
+        .alignItems(HorizontalAlign.Center)
+        .layoutWeight(1)
+        .height(76)
+        .padding(12)
+        .backgroundColor(AppColors.softDanger())
+        .borderRadius(16)
+
+        Column({ space: 4 }) {
+          Text('剩余')
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+          Text(NumberUtil.compactMoney(this.remainingTotal()))
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.CHART_GREEN)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .textAlign(TextAlign.Center)
+        }
+        .alignItems(HorizontalAlign.Center)
+        .layoutWeight(1)
+        .height(76)
+        .padding(12)
+        .backgroundColor(AppColors.softGreen())
+        .borderRadius(16)
+
+        Column({ space: 4 }) {
+          Text('进度')
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+          Text(`${this.totalProgress()}%`)
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.CHART_BLUE)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .textAlign(TextAlign.Center)
+        }
+        .alignItems(HorizontalAlign.Center)
+        .layoutWeight(1)
+        .height(76)
+        .padding(12)
+        .backgroundColor(AppColors.SURFACE_TINT)
+        .borderRadius(16)
       }
       .width('100%')
 
@@ -171,7 +233,7 @@ struct BudgetSetting {
         Column()
           .height(10)
           .width('100%')
-          .backgroundColor('#EAF0F6')
+          .backgroundColor(AppColors.TRACK)
           .borderRadius(5)
         Column()
           .height(10)
@@ -263,16 +325,18 @@ struct BudgetSetting {
               .fontWeight(FontWeight.Bold)
               .fontColor(AppColors.INK)
               .maxLines(1)
-            Text(`已用 ${NumberUtil.money(item.spent)}`)
+            Text(`已用 ${NumberUtil.compactMoney(item.spent)}`)
               .fontSize(12)
               .fontColor(AppColors.MUTED)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .alignItems(HorizontalAlign.Start)
         }
         .layoutWeight(1)
 
         TextInput({ text: item.budgetText, placeholder: '0.00' })
-          .type(InputType.Number)
+          .type(InputType.NUMBER_DECIMAL)
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .width(110)
@@ -282,7 +346,11 @@ struct BudgetSetting {
           .borderRadius(16)
           .padding({ left: 14, right: 14 })
           .onChange((value: string) => {
-            this.rows[index].budgetText = value;
+            this.rows[index].budgetText = this.normalizeAmount(value);
+            this.categoryBudgetTotal = this.rows.reduce((total: number, row: BudgetRow) => {
+              return total + this.parseAmount(row.budgetText);
+            }, 0);
+            this.refreshBudgetStats();
           })
       }
       .width('100%')
@@ -353,16 +421,29 @@ struct BudgetSetting {
       const endTime = DateUtil.startOfNextMonth(this.anchorTime);
       const categories = await this.categoryRepository.listByType(RecordType.EXPENSE);
       const budgets = await this.budgetRepository.listByMonth(month);
-      const summary = await this.recordRepository.monthSummary(startTime, endTime);
-      this.totalBudgetText = `${this.totalBudgetAmount(budgets)}`;
-      const rankList = await this.recordRepository.categoryExpenseRanks(startTime, endTime);
-      const compatibleSpent = await this.compatibleExpenseByCategory(startTime, endTime);
-      this.rows = this.buildRows(categories, budgets, rankList, compatibleSpent);
+      this.totalBudgetValue = this.totalBudgetAmount(budgets);
+      this.categoryBudgetTotal = this.categoryBudgetAmount(budgets);
+      this.totalBudgetText = this.formatBudgetInput(this.totalBudgetValue);
+      const spentByCategory = this.mergeSpentMaps(
+        await this.recordRepository.expenseByCategoryByMonth(month),
+        await this.recordRepository.expenseByCategory(startTime, endTime)
+      );
+      this.rows = this.buildRows(categories, budgets, spentByCategory);
+      const monthSummary = await this.recordRepository.monthSummary(startTime, endTime);
+      const directTotal = Math.max(
+        monthSummary.expense,
+        await this.recordRepository.expenseTotalByMonth(month),
+        await this.recordRepository.expenseTotal(startTime, endTime)
+      );
       const rowSpentTotal = this.rows.reduce((total: number, item: BudgetRow) => total + item.spent, 0);
-      this.spentTotal = rowSpentTotal > 0 ? rowSpentTotal : summary.expense;
+      this.spentTotal = Math.max(directTotal, rowSpentTotal);
+      this.refreshBudgetStats();
     } catch (error) {
       this.rows = [];
       this.spentTotal = 0;
+      this.categoryBudgetTotal = 0;
+      this.remainingTotalValue = 0;
+      this.totalProgressValue = 0;
       ToastUtil.show('预算数据加载失败，请稍后重试');
     } finally {
       this.loading = false;
@@ -372,16 +453,11 @@ struct BudgetSetting {
   private buildRows(
     categories: CategoryModel[],
     budgets: BudgetModel[],
-    ranks: CategoryExpenseRank[],
-    compatibleSpent: Map<number, number>
+    spentByCategory: Map<number, number>
   ): BudgetRow[] {
     const budgetMap = new Map<number, BudgetModel>();
     budgets.forEach((item: BudgetModel) => {
       budgetMap.set(item.categoryId, item);
-    });
-    const spentMap = new Map<number, number>();
-    ranks.forEach((item: CategoryExpenseRank) => {
-      spentMap.set(item.categoryId, item.amount);
     });
     return categories.map((category: CategoryModel) => {
       const budget = budgetMap.get(category.id || 0);
@@ -390,10 +466,21 @@ struct BudgetSetting {
         categoryName: category.name,
         categoryColor: category.color,
         budgetText: budget ? `${budget.amount}` : '0',
-        spent: spentMap.get(category.id || 0) || compatibleSpent.get(category.id || 0) || 0
+        spent: spentByCategory.get(category.id || 0) || 0
       };
       return row;
     });
+  }
+
+  private mergeSpentMaps(primary: Map<number, number>, fallback: Map<number, number>): Map<number, number> {
+    const result = new Map<number, number>();
+    primary.forEach((amount: number, categoryId: number) => {
+      result.set(categoryId, Math.abs(amount));
+    });
+    fallback.forEach((amount: number, categoryId: number) => {
+      result.set(categoryId, Math.max(result.get(categoryId) || 0, Math.abs(amount)));
+    });
+    return result;
   }
 
   private async saveBudget(): Promise<void> {
@@ -401,10 +488,11 @@ struct BudgetSetting {
       this.loading = true;
       await AppDatabase.getInstance().init(getContext(this));
       const month = DateUtil.monthKey(this.anchorTime);
-      const total = Number(this.totalBudgetText) || 0;
+      const total = this.parseAmount(this.totalBudgetText);
+      this.totalBudgetValue = total;
       await this.budgetRepository.upsertMonthlyBudget(0, total, month);
       for (const row of this.rows) {
-        await this.budgetRepository.upsertMonthlyBudget(row.categoryId, Number(row.budgetText) || 0, month);
+        await this.budgetRepository.upsertMonthlyBudget(row.categoryId, this.parseAmount(row.budgetText), month);
       }
       await AppState.getInstance().refreshAll();
       await this.loadMonthData();
@@ -421,31 +509,20 @@ struct BudgetSetting {
     return item ? item.amount : 0;
   }
 
-  private rankExpenseTotal(ranks: CategoryExpenseRank[]): number {
-    return ranks.reduce((total: number, item: CategoryExpenseRank) => total + item.amount, 0);
+  private categoryBudgetAmount(budgets: BudgetModel[]): number {
+    return budgets.reduce((total: number, item: BudgetModel) => {
+      return item.categoryId > 0 ? total + item.amount : total;
+    }, 0);
   }
 
-  private async compatibleExpenseByCategory(startTime: number, endTime: number): Promise<Map<number, number>> {
-    const records = await this.recordRepository.listByRange(startTime, endTime, 10000, 0);
-    const result = new Map<number, number>();
-    records.forEach((item) => {
-      if (item.type === RecordType.EXPENSE) {
-        result.set(item.categoryId, (result.get(item.categoryId) || 0) + item.amount);
-      }
-    });
-    return result;
-  }
-
-  private mapExpenseTotal(spent: Map<number, number>): number {
-    let total = 0;
-    spent.forEach((amount: number) => {
-      total += amount;
-    });
-    return total;
+  private effectiveBudgetAmount(): number {
+    const textBudget = this.parseAmount(this.totalBudgetText);
+    const totalBudget = textBudget > 0 ? textBudget : this.totalBudgetValue;
+    return totalBudget > 0 ? totalBudget : this.categoryBudgetTotal;
   }
 
   private rowProgress(row: BudgetRow): number {
-    const budget = Number(row.budgetText) || 0;
+    const budget = this.parseAmount(row.budgetText);
     if (budget <= 0) {
       return 0;
     }
@@ -453,7 +530,7 @@ struct BudgetSetting {
   }
 
   private totalProgress(): number {
-    const total = Number(this.totalBudgetText) || 0;
+    const total = this.effectiveBudgetAmount();
     if (total <= 0) {
       return 0;
     }
@@ -461,7 +538,30 @@ struct BudgetSetting {
   }
 
   private remainingTotal(): number {
-    return Math.max(0, (Number(this.totalBudgetText) || 0) - this.spentTotal);
+    return Math.max(0, this.effectiveBudgetAmount() - this.spentTotal);
+  }
+
+  private refreshBudgetStats(): void {
+    this.remainingTotalValue = this.remainingTotal();
+    this.totalProgressValue = this.totalProgress();
+  }
+
+  private parseAmount(value: string): number {
+    const normalized = this.normalizeAmount(value);
+    return Number(normalized) || 0;
+  }
+
+  private normalizeAmount(value: string): string {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return cleaned;
+    }
+    return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+  }
+
+  private formatBudgetInput(value: number): string {
+    return value > 0 ? `${value}` : '0';
   }
 
   private monthLabel(): string {

@@ -7,6 +7,7 @@ import { ROUTES } from '../constants/RouteConstants';
 @Component
 struct Profile {
   @State viewportWidth: number = 0;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
 
   build() {
     Column() {
@@ -127,15 +128,15 @@ struct Profile {
   @Builder
   private ShortcutGrid() {
     Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-      this.ShortcutCard('收支日历', '查看每日收入支出', '日', AppColors.LILAC, '#EEEAFE', ROUTES.CALENDAR)
+      this.ShortcutCard('收支日历', '查看每日收入支出', '日', AppColors.LILAC, AppColors.softPurple(), ROUTES.CALENDAR)
       this.ShortcutCard('分类管理', '调整常用分类', '类', AppColors.LEDGER, AppColors.SURFACE_TINT, ROUTES.CATEGORY_MANAGE)
-      this.ShortcutCard('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, '#E5F8F6', ROUTES.ACCOUNT_MANAGE)
-      this.ShortcutCard('预算管理', '控制月度支出', '预', AppColors.WARNING, '#FFF5DF', ROUTES.BUDGET_SETTING)
+      this.ShortcutCard('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, AppColors.softCyan(), ROUTES.ACCOUNT_MANAGE)
+      this.ShortcutCard('预算管理', '控制月度支出', '预', AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
       if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-        this.ShortcutCard('主动识别记账', '截图 OCR', '识', AppColors.CHART_BLUE, '#EAF4FF', ROUTES.AUTO_BOOKKEEPING)
+        this.ShortcutCard('主动识别记账', '截图 OCR', '识', AppColors.CHART_BLUE, AppColors.softBlue(), ROUTES.AUTO_BOOKKEEPING)
       }
-      this.ShortcutCard('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, '#E6F6F0', ROUTES.DATA_EXPORT)
-      this.ShortcutCard('设置', '主题与提醒', '设', AppColors.LILAC, '#EEEAFE', ROUTES.SETTINGS)
+      this.ShortcutCard('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, AppColors.softGreen(), ROUTES.DATA_EXPORT)
+      this.ShortcutCard('设置', '主题与偏好', '设', AppColors.LILAC, AppColors.softPurple(), ROUTES.SETTINGS)
       this.ShortcutCard('关于', '版本与说明', '关', AppColors.MUTED, AppColors.SURFACE_SOFT, ROUTES.ABOUT)
     }
     .width('100%')

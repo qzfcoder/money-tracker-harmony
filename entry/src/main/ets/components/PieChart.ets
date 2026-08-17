@@ -6,6 +6,7 @@ import { NumberUtil } from '../utils/NumberUtil';
 export struct PieChart {
   @Prop items: CategoryRankItem[] = [];
   @State viewportWidth: number = 0;
+  @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
@@ -44,9 +45,10 @@ export struct PieChart {
 
         Stack({ alignContent: Alignment.Center }) {
           Canvas(this.context)
+            .id(this.canvasKey())
             .width('100%')
             .height(this.chartHeight())
-            .backgroundColor('#F7FBFF')
+            .backgroundColor(AppColors.PANEL)
             .borderRadius(24)
             .onReady(() => this.drawChart())
             .onAreaChange(() => this.drawChart())
@@ -82,7 +84,7 @@ export struct PieChart {
       }
       .width('100%')
       .padding(this.isPhone() ? 12 : 18)
-      .backgroundColor('#F7FBFF')
+      .backgroundColor(AppColors.PANEL)
       .borderRadius(24)
 
       if (this.items.length > 0) {
@@ -167,7 +169,7 @@ export struct PieChart {
     const width = Math.max(1, this.context.width);
     const height = Math.max(1, this.context.height);
     this.context.clearRect(0, 0, width, height);
-    this.context.fillStyle = '#F7FBFF';
+    this.context.fillStyle = AppColors.PANEL;
     this.context.fillRect(0, 0, width, height);
     if (this.items.length === 0) {
       return;
@@ -189,7 +191,7 @@ export struct PieChart {
       this.context.closePath();
       this.context.fillStyle = this.rankColorByIndex(index);
       this.context.fill();
-      this.context.strokeStyle = '#F7FBFF';
+      this.context.strokeStyle = AppColors.PANEL;
       this.context.lineWidth = 2;
       this.context.stroke();
       startAngle += sweep;
@@ -197,7 +199,7 @@ export struct PieChart {
 
     this.context.beginPath();
     this.context.arc(centerX, centerY, radius * 0.66, 0, Math.PI * 2);
-    this.context.fillStyle = '#F7FBFF';
+    this.context.fillStyle = AppColors.PANEL;
     this.context.fill();
   }
 
@@ -256,6 +258,10 @@ export struct PieChart {
     return this.isPhone() ? 92 : 118;
   }
 
+  private canvasKey(): string {
+    return `pie-chart-${this.items.length}-${this.totalAmount()}-${this.totalRecords()}-${this.isDarkMode}`;
+  }
+
   private rankColorByIndex(index: number): string {
     const colors: string[] = [
       AppColors.CHART_PINK,
@@ -269,7 +275,14 @@ export struct PieChart {
   }
 
   private rankBgByIndex(index: number): string {
-    const colors: string[] = ['#FFEAF0', '#FFF4DE', '#EAF4FF', '#E5F8F6', '#EEEBFF', '#E6F7EF'];
+    const colors: string[] = [
+      AppColors.softPink(),
+      AppColors.softYellow(),
+      AppColors.softBlue(),
+      AppColors.softCyan(),
+      AppColors.softPurple(),
+      AppColors.softGreen()
+    ];
     return colors[index % colors.length];
   }
 }

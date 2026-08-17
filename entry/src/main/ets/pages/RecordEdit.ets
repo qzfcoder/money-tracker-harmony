@@ -188,7 +188,7 @@ struct RecordEdit {
       .width('100%')
 
       TextInput({ text: this.amountText, placeholder: '0.00' })
-        .type(InputType.Number)
+        .type(InputType.NUMBER_DECIMAL)
         .fontSize(34)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.INK)

@@ -1,7 +1,8 @@
-import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, Configuration, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { AppDatabase } from '../database/AppDatabase';
+import { ThemeUtil } from '../utils/ThemeUtil';
 
 const DOMAIN = 0x0001;
 
@@ -11,7 +12,12 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.savedLaunchWant = want;
+    ThemeUtil.updateSystemColorMode(this.context.config.colorMode);
     hilog.info(DOMAIN, 'EntryAbility', 'onCreate');
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    ThemeUtil.updateSystemColorMode(newConfig.colorMode);
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {

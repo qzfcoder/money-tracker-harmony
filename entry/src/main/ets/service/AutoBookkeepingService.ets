@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { AccountModel, AccountType } from '../model/Account';
-import { AutoBillModel, AutoBillStatus, AutoCaptureSource, AutoNotificationPayload, AutoParseResult, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
+import { AutoBillModel, AutoBillStatus, AutoCapturePayload, AutoCaptureSource, AutoParseResult, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
 import { CategoryModel } from '../model/Category';
 import { RecordType } from '../model/Record';
 import { AccountRepository } from '../repository/AccountRepository';
@@ -40,20 +40,6 @@ export class AutoBookkeepingService {
 
   static create(context: common.Context): AutoBookkeepingService {
     return new AutoBookkeepingService(context);
-  }
-
-  async handleNotification(payload: AutoNotificationPayload): Promise<AutoParseResult> {
-    const settings = await this.loadSettings();
-    if (!settings.autoBookkeepingEnabled) {
-      return { matched: false, reason: 'auto-disabled' };
-    }
-    if (payload.source === AutoCaptureSource.NOTIFICATION && !settings.autoNotificationEnabled) {
-      return { matched: false, reason: 'notification-disabled' };
-    }
-    if (payload.source === AutoCaptureSource.SMS && !settings.autoSmsEnabled) {
-      return { matched: false, reason: 'sms-disabled' };
-    }
-    return await this.capturePayload(payload, settings);
   }
 
   async preview(rawText: string): Promise<AutoParseResult> {
@@ -144,12 +130,12 @@ export class AutoBookkeepingService {
     await this.autoRepository.clearPendingCache();
   }
 
-  async seedPreview(payload: AutoNotificationPayload): Promise<AutoParseResult> {
+  async seedPreview(payload: AutoCapturePayload): Promise<AutoParseResult> {
     const settings = await this.loadSettings();
     return await this.capturePayload(payload, settings, false);
   }
 
-  private async capturePayload(payload: AutoNotificationPayload, settings: AutoBookkeepingSettings, persist: boolean = true): Promise<AutoParseResult> {
+  private async capturePayload(payload: AutoCapturePayload, settings: AutoBookkeepingSettings, persist: boolean = true): Promise<AutoParseResult> {
     const rules = await this.listRules();
     const categories = await this.categoryRepository.listAll();
     const accounts = await this.accountRepository.list();
@@ -165,7 +151,7 @@ export class AutoBookkeepingService {
   }
 
   private parsePayload(
-    payload: AutoNotificationPayload,
+    payload: AutoCapturePayload,
     rules: AutoRuleModel[],
     categories: CategoryModel[],
     accounts: AccountModel[],
@@ -215,7 +201,7 @@ export class AutoBookkeepingService {
     };
   }
 
-  private buildRemark(payload: AutoNotificationPayload, text: string, categoryName: string): string {
+  private buildRemark(payload: AutoCapturePayload, text: string, categoryName: string): string {
     const merchant = this.extractMerchant(text);
     if (merchant.length > 0) {
       return merchant.substring(0, 50);
@@ -244,7 +230,7 @@ export class AutoBookkeepingService {
     return Math.min(0.99, Math.round(score * 100) / 100);
   }
 
-  private resolveType(text: string, payload: AutoNotificationPayload): RecordType.EXPENSE | RecordType.INCOME {
+  private resolveType(text: string, payload: AutoCapturePayload): RecordType.EXPENSE | RecordType.INCOME {
     const incomeKeywords: string[] = ['收入', '入账', '到账', '收款到账', '收款', '转入', '工资', '奖金', '退款', '退回', '报销', '返现'];
     const expenseKeywords: string[] = ['支出', '消费', '付款成功', '支付成功', '付款', '支付', '扣款', '扣费', '转出', '花费', '买单', '已扣'];
     const incomeIndex = this.firstKeywordIndex(text, incomeKeywords);
@@ -343,7 +329,7 @@ export class AutoBookkeepingService {
     };
   }
 
-  private resolveAccount(payload: AutoNotificationPayload, text: string, accounts: AccountModel[], defaultAccountId: number): AccountModel {
+  private resolveAccount(payload: AutoCapturePayload, text: string, accounts: AccountModel[], defaultAccountId: number): AccountModel {
     const sourceText = this.normalizeText(`${payload.appName} ${payload.bundleName} ${text}`);
     const directKeywords: string[] = ['微信支付', '微信', 'weixin', 'wechat', '支付宝', 'alipay', '银行卡', 'bank', '银行'];
     for (const keyword of directKeywords) {
