@@ -22,7 +22,6 @@ import { ThemeUtil } from '../utils/ThemeUtil';
 struct Index {
   private homeRecordRepository: RecordRepository = new RecordRepository();
   private homeBudgetRepository: BudgetRepository = new BudgetRepository();
-  private homeAutoRepository: AutoBookkeepingRepository = new AutoBookkeepingRepository();
   private settingsRepository: SettingsRepository = new SettingsRepository();
 
   @State currentTab: number = 0;
@@ -1182,7 +1181,7 @@ struct Index {
       const monthSummary = await this.homeRecordRepository.monthSummary(monthStart, monthEnd);
       const recordCount = await this.homeRecordRepository.recordCount(todayStart, todayEnd);
       const budgets = await this.homeBudgetRepository.listByMonth(DateUtil.monthKey());
-      const pendingCount = await this.homeAutoRepository.countPending();
+      const pendingCount = FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? await new AutoBookkeepingRepository().countPending() : 0;
 
       this.todayIncome = todaySummary.income;
       this.todayExpense = todaySummary.expense;

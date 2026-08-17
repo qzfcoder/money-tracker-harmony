@@ -5,6 +5,7 @@ import { AccountRepository } from '../repository/AccountRepository';
 import { AutoBookkeepingRepository } from '../repository/AutoBookkeepingRepository';
 import { BudgetRepository } from '../repository/BudgetRepository';
 import { RecordRepository } from '../repository/RecordRepository';
+import { FeatureFlags } from '../constants/FeatureFlags';
 import { DateUtil } from '../utils/DateUtil';
 
 @Observed
@@ -12,7 +13,6 @@ export class AppState {
   private static instance: AppState | null = null;
   private recordRepository: RecordRepository = new RecordRepository();
   private accountRepository: AccountRepository = new AccountRepository();
-  private autoRepository: AutoBookkeepingRepository = new AutoBookkeepingRepository();
   private budgetRepository: BudgetRepository = new BudgetRepository();
 
   monthIncome: number = 0;
@@ -112,6 +112,10 @@ export class AppState {
   }
 
   async refreshPendingAutoBills(): Promise<void> {
-    this.pendingAutoBillCount = await this.autoRepository.countPending();
+    if (!FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+      this.pendingAutoBillCount = 0;
+      return;
+    }
+    this.pendingAutoBillCount = await new AutoBookkeepingRepository().countPending();
   }
 }
