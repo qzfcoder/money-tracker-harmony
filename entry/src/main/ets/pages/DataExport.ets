@@ -11,7 +11,8 @@ import { AppDatabase } from '../database/AppDatabase';
 
 enum ExportScope {
   MONTH = 'month',
-  RECENT = 'recent'
+  RECENT = 'recent',
+  CUSTOM = 'custom'
 }
 
 @Entry
@@ -25,6 +26,11 @@ struct DataExport {
   @State incomeTotal: number = 0;
   @State expenseTotal: number = 0;
   @State balanceTotal: number = 0;
+  @State customStartTime: number = DateUtil.startOfMonth();
+  @State customEndTime: number = DateUtil.addDays(DateUtil.startOfDay(), 1);
+  @State draftCustomStartTime: number = DateUtil.startOfMonth();
+  @State draftCustomEndTime: number = DateUtil.startOfDay();
+  @State customEditorVisible: boolean = false;
 
   aboutToAppear(): void {
     this.loadRecords();
@@ -140,8 +146,43 @@ struct DataExport {
       Row({ space: 10 }) {
         this.ScopeButton('本月账单', ExportScope.MONTH)
         this.ScopeButton('最近 1000 条', ExportScope.RECENT)
+        this.ScopeButton('自定义', ExportScope.CUSTOM)
       }
       .width('100%')
+
+      if (this.customEditorVisible) {
+        Column({ space: 10 }) {
+          Row({ space: 8 }) {
+            this.DateField('开始日期', this.draftCustomStartTime, true)
+            this.DateField('结束日期', this.draftCustomEndTime, false)
+          }
+          .width('100%')
+          Row({ space: 8 }) {
+            Button('取消')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.MUTED)
+              .width(76)
+              .height(38)
+              .backgroundColor(AppColors.SURFACE_SOFT)
+              .borderRadius(AppRadius.PILL)
+              .onClick(() => {
+                this.customEditorVisible = false;
+              })
+            Button('应用范围')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.SURFACE)
+              .layoutWeight(1)
+              .height(38)
+              .backgroundColor(AppColors.CHART_BLUE)
+              .borderRadius(AppRadius.PILL)
+              .onClick(() => this.applyCustomRange())
+          }
+          .width('100%')
+        }
+        .width('100%')
+      }
     }
     .width('100%')
     .padding(16)
@@ -163,8 +204,43 @@ struct DataExport {
       .borderRadius(AppRadius.PILL)
       .onClick(() => {
         this.exportScope = scope;
-        this.loadRecords();
+        if (scope === ExportScope.CUSTOM) {
+          this.openCustomEditor();
+        } else {
+          this.customEditorVisible = false;
+          this.loadRecords();
+        }
       })
+  }
+
+  @Builder
+  private DateField(label: string, timestamp: number, isStart: boolean) {
+    Column({ space: 8 }) {
+      Text(label)
+        .fontSize(11)
+        .fontColor(AppColors.MUTED)
+        .width('100%')
+      Row() {
+        Text(this.fullDateLabel(timestamp))
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+          .layoutWeight(1)
+          .maxLines(1)
+        Text('›')
+          .fontSize(20)
+          .fontColor(AppColors.CHART_BLUE)
+      }
+      .width('100%')
+      .height(26)
+    }
+    .layoutWeight(1)
+    .height(62)
+    .padding({ left: 12, right: 10, top: 8, bottom: 8 })
+    .backgroundColor(AppColors.SURFACE_SOFT)
+    .border({ width: 1, color: AppColors.LINE })
+    .borderRadius(14)
+    .onClick(() => this.showCustomDatePicker(isStart))
   }
 
   @Builder
@@ -278,6 +354,9 @@ struct DataExport {
     if (this.exportScope === ExportScope.MONTH) {
       return await this.repository.listByRange(DateUtil.startOfMonth(), DateUtil.startOfNextMonth(), 1000, 0);
     }
+    if (this.exportScope === ExportScope.CUSTOM) {
+      return await this.repository.listByRange(this.customStartTime, this.customEndTime, 1000, 0);
+    }
     return await this.repository.listRecent(1000, 0);
   }
 
@@ -325,18 +404,82 @@ struct DataExport {
   }
 
   private scopeTitle(): string {
-    return this.exportScope === ExportScope.MONTH ? '本月可导出账单' : '可导出账单';
+    if (this.exportScope === ExportScope.MONTH) {
+      return '本月可导出账单';
+    }
+    if (this.exportScope === ExportScope.CUSTOM) {
+      return '自定义范围账单';
+    }
+    return '可导出账单';
   }
 
   private scopeHint(): string {
-    return this.exportScope === ExportScope.MONTH ? '当前导出本月流水，最多 1000 条' : '当前导出最近 1000 条流水';
+    if (this.exportScope === ExportScope.MONTH) {
+      return '当前导出本月流水，最多 1000 条';
+    }
+    if (this.exportScope === ExportScope.CUSTOM) {
+      return `当前导出 ${DateUtil.rangeLabel(this.customStartTime, this.customEndTime)} 流水，最多 1000 条`;
+    }
+    return '当前导出最近 1000 条流水';
   }
 
   private fileNameSuffix(): string {
     if (this.exportScope === ExportScope.MONTH) {
       return DateUtil.monthKey(Date.now());
     }
+    if (this.exportScope === ExportScope.CUSTOM) {
+      return `${DateUtil.dayKey(this.customStartTime)}-${DateUtil.dayKey(this.customEndTime - 1)}`;
+    }
     return DateUtil.dayKey(Date.now());
+  }
+
+  private openCustomEditor(): void {
+    this.exportScope = ExportScope.CUSTOM;
+    this.draftCustomStartTime = this.customStartTime;
+    this.draftCustomEndTime = this.customEndTime - 1;
+    this.customEditorVisible = true;
+    this.loadRecords();
+  }
+
+  private showCustomDatePicker(isStart: boolean): void {
+    const current = new Date(isStart ? this.draftCustomStartTime : this.draftCustomEndTime);
+    DatePickerDialog.show({
+      selected: current,
+      start: new Date(2000, 0, 1),
+      end: new Date(2100, 11, 31),
+      onAccept: (value: DatePickerResult) => {
+        const timestamp = new Date(
+          value.year ?? current.getFullYear(),
+          value.month ?? current.getMonth(),
+          value.day ?? current.getDate()
+        ).getTime();
+        if (isStart) {
+          this.draftCustomStartTime = timestamp;
+          if (timestamp > this.draftCustomEndTime) {
+            this.draftCustomEndTime = timestamp;
+          }
+        } else {
+          this.draftCustomEndTime = timestamp;
+          if (timestamp < this.draftCustomStartTime) {
+            this.draftCustomStartTime = timestamp;
+          }
+        }
+      }
+    });
+  }
+
+  private async applyCustomRange(): Promise<void> {
+    this.customStartTime = DateUtil.startOfDay(this.draftCustomStartTime);
+    this.customEndTime = DateUtil.addDays(DateUtil.startOfDay(this.draftCustomEndTime), 1);
+    this.customEditorVisible = false;
+    await this.loadRecords();
+  }
+
+  private fullDateLabel(timestamp: number): string {
+    const date = new Date(timestamp);
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${date.getFullYear()}/${month}/${day}`;
   }
 
   private typeLabel(type: RecordType): string {

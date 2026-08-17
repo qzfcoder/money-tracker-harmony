@@ -215,6 +215,9 @@ try {
     Assert-FileMatches 'Amount parse' (Join-Path $Root $file) 'NumberUtil\.toCentSafe'
   }
 
+  Assert-FileMatches 'Custom CSV export' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'ExportScope\.CUSTOM'
+  Assert-FileMatches 'Custom CSV export date picker' (Join-Path $Root 'entry/src/main/ets/pages/DataExport.ets') 'DatePickerDialog\.show'
+
   $deletedFiles = @(
     'entry/src/main/ets/extension/NotificationBookkeepingSubscriber.ets',
     'entry/src/main/ets/service/ReminderService.ets'
