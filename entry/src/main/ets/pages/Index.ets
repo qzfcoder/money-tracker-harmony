@@ -3,11 +3,9 @@ import { AppState } from '../viewmodel/AppState';
 import { AccountModel } from '../model/Account';
 import { BudgetModel } from '../model/Budget';
 import { RecordListItem } from '../model/Record';
-import { AutoBookkeepingRepository } from '../repository/AutoBookkeepingRepository';
 import { BudgetRepository } from '../repository/BudgetRepository';
 import { RecordRepository } from '../repository/RecordRepository';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
-import { FeatureFlags } from '../constants/FeatureFlags';
 import { ROUTES } from '../constants/RouteConstants';
 import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
@@ -314,22 +312,14 @@ struct Index {
     if (this.isPhone()) {
       Row({ space: 8 }) {
         this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
-        if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-          this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
-        } else {
-          this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
-        }
+        this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
         this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.SEARCH)
       }
       .width('100%')
     } else if (this.isDesktop()) {
       Row({ space: 12 }) {
         this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
-        if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-          this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
-        } else {
-          this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
-        }
+        this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
         this.SupportPill('搜索', () => '查流水', AppColors.CHART_GREEN, AppColors.softGreen(), ROUTES.SEARCH)
       }
       .width('100%')
@@ -337,11 +327,7 @@ struct Index {
       Column({ space: 10 }) {
         Row({ space: 10 }) {
           this.SupportPill('预算', () => this.budgetMiniText(), AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
-          if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-            this.SupportPill('待确认', () => `${this.pendingAutoBillCount} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.AUTO_BOOKKEEPING)
-          } else {
-            this.SupportPill('结余', () => NumberUtil.compactMoney(this.monthBalance), AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.STATISTICS)
-          }
+          this.SupportPill('结余', () => NumberUtil.compactMoney(this.monthBalance), AppColors.CHART_BLUE, AppColors.SURFACE_TINT, ROUTES.STATISTICS)
         }
         Row({ space: 10 }) {
           this.SupportPill('本月支出', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, AppColors.softPink(), ROUTES.STATISTICS)
@@ -910,9 +896,6 @@ struct Index {
       this.ProfileShortcut('分类管理', '调整常用分类', '类', AppColors.LEDGER, AppColors.SURFACE_TINT, ROUTES.CATEGORY_MANAGE)
       this.ProfileShortcut('账户管理', '维护账户余额', '户', AppColors.CHART_CYAN, AppColors.softCyan(), ROUTES.ACCOUNT_MANAGE)
       this.ProfileShortcut('预算管理', '控制月度支出', '预', AppColors.WARNING, AppColors.softYellow(), ROUTES.BUDGET_SETTING)
-      if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-        this.ProfileShortcut('自动记账', this.pendingAutoBillCount > 0 ? `${this.pendingAutoBillCount} 条待确认` : '审核识别账单', '识', AppColors.CHART_BLUE, AppColors.softBlue(), ROUTES.AUTO_BOOKKEEPING)
-      }
       this.ProfileShortcut('数据导出与备份', '导出账单和恢复备份', '备', AppColors.INCOME, AppColors.softGreen(), ROUTES.DATA_EXPORT)
       this.ProfileShortcut('设置', '主题与偏好', '设', AppColors.LILAC, AppColors.softPurple(), ROUTES.SETTINGS)
       this.ProfileShortcut('关于', '版本与说明', '关', AppColors.MUTED, AppColors.SURFACE_SOFT, ROUTES.ABOUT)
@@ -1181,7 +1164,7 @@ struct Index {
       const monthSummary = await this.homeRecordRepository.monthSummary(monthStart, monthEnd);
       const recordCount = await this.homeRecordRepository.recordCount(todayStart, todayEnd);
       const budgets = await this.homeBudgetRepository.listByMonth(DateUtil.monthKey());
-      const pendingCount = FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? await new AutoBookkeepingRepository().countPending() : 0;
+      const pendingCount = 0;
 
       this.todayIncome = todaySummary.income;
       this.todayExpense = todaySummary.expense;

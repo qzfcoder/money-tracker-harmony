@@ -1,7 +1,6 @@
 import { router } from '@kit.ArkUI';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
 import { ROUTES } from '../constants/RouteConstants';
-import { FeatureFlags } from '../constants/FeatureFlags';
 import { RecordListItem, RecordType } from '../model/Record';
 import { DailyCashflow, RecordRepository } from '../repository/RecordRepository';
 import { DateUtil } from '../utils/DateUtil';
@@ -290,32 +289,6 @@ struct CalendarPage {
             selected.setHours(now.getHours(), now.getMinutes(), 0, 0);
             router.pushUrl({ url: ROUTES.RECORD_EDIT, params: { recordTime: selected.getTime() } });
           })
-        if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE || FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
-          Button(FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? '识别账单' : '导入账单')
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.CHART_BLUE)
-            .height(46)
-            .layoutWeight(1)
-            .backgroundColor(AppColors.SURFACE_TINT)
-            .borderRadius(AppRadius.PILL)
-            .onClick(() => {
-              if (!FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-                router.pushUrl({ url: ROUTES.ALIPAY_IMPORT });
-                return;
-              }
-              const selected = new Date(this.selectedTime);
-              const now = new Date();
-              selected.setHours(now.getHours(), now.getMinutes(), 0, 0);
-              router.pushUrl({
-                url: ROUTES.AUTO_BOOKKEEPING,
-                params: {
-                  launchAction: 'galleryOcr',
-                  recordTime: selected.getTime()
-                }
-              });
-            })
-        }
       }
       .width('100%')
 

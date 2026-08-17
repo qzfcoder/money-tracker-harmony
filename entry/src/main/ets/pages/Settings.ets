@@ -1,6 +1,5 @@
 import { router } from '@kit.ArkUI';
 import { AppColors, AppRadius, AppSpace, LayoutSizes } from '../constants/DesignSystem';
-import { FeatureFlags } from '../constants/FeatureFlags';
 import { ROUTES } from '../constants/RouteConstants';
 import { AppSettingsData, SettingsRepository, ThemeMode } from '../repository/SettingsRepository';
 import { ThemeUtil } from '../utils/ThemeUtil';
@@ -33,12 +32,6 @@ struct Settings {
           this.ProfileCard()
           this.ThemeCard()
           this.CurrencyCard()
-          if (FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
-            this.AlipayImportCard()
-          }
-          if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-            this.AutoBookkeepingCard()
-          }
           this.DataCard()
           this.SaveBar()
         }
@@ -161,107 +154,6 @@ struct Settings {
   }
 
   @Builder
-  private AlipayImportCard() {
-    Column({ space: 14 }) {
-      this.CardTitle('支付宝账单导入', this.alipayBillImportEnabled ? '已开启' : '未开启')
-      Row({ space: 10 }) {
-        Button(this.alipayBillImportEnabled ? '关闭导入' : '开启导入')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.alipayBillImportEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
-          .height(46)
-          .layoutWeight(1)
-          .backgroundColor(this.alipayBillImportEnabled ? AppColors.softDanger() : AppColors.SURFACE_TINT)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => {
-            this.toggleAlipayImportSetting();
-          })
-        Button('导入账单')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.SURFACE)
-          .height(46)
-          .layoutWeight(1)
-          .opacity(this.alipayBillImportEnabled ? 1 : 0.45)
-          .backgroundColor(AppColors.CHART_BLUE)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => {
-            if (this.alipayBillImportEnabled) {
-              router.pushUrl({ url: ROUTES.ALIPAY_IMPORT });
-            } else {
-              ToastUtil.show('请先开启账单导入');
-            }
-          })
-      }
-      .width('100%')
-      Text('支持导入支付宝导出的 CSV 文件。账单会先进入待确认列表，审核后才会写入正式流水。')
-        .fontSize(12)
-        .fontColor(AppColors.MUTED)
-        .lineHeight(20)
-        .width('100%')
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor(AppColors.SURFACE)
-    .borderRadius(AppRadius.CARD)
-    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
-  }
-
-  @Builder
-  private AutoBookkeepingCard() {
-    Column({ space: 14 }) {
-      this.CardTitle('主动识别记账', this.autoBookkeepingEnabled ? '已开启' : '未开启')
-      Row({ space: 10 }) {
-        Button(this.autoBookkeepingEnabled ? '关闭辅助' : '开启辅助')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.autoBookkeepingEnabled ? AppColors.EXPENSE : AppColors.CHART_BLUE)
-          .height(46)
-          .layoutWeight(1)
-          .backgroundColor(this.autoBookkeepingEnabled ? AppColors.softDanger() : AppColors.SURFACE_TINT)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => {
-            this.toggleAutoBookkeepingSetting();
-          })
-        Button('去识别')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.SURFACE)
-          .height(46)
-          .layoutWeight(1)
-          .backgroundColor(AppColors.CHART_BLUE)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => router.pushUrl({ url: ROUTES.AUTO_BOOKKEEPING }))
-      }
-      .width('100%')
-      Text('打开账单详情后手动截图，回到应用选择截图识别。本机 OCR 识别后会先进入待确认账单。')
-        .fontSize(12)
-        .fontColor(AppColors.MUTED)
-        .lineHeight(20)
-        .width('100%')
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor(AppColors.SURFACE)
-    .borderRadius(AppRadius.CARD)
-    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
-  }
-
-  @Builder
-  private AutoChip(label: string, enabled: boolean, onClick: () => void) {
-    Text(label)
-      .fontSize(13)
-      .fontWeight(FontWeight.Bold)
-      .fontColor(enabled ? AppColors.SURFACE : AppColors.MUTED)
-      .height(38)
-      .layoutWeight(1)
-      .textAlign(TextAlign.Center)
-      .backgroundColor(enabled ? AppColors.CHART_BLUE : AppColors.SURFACE_SOFT)
-      .borderRadius(AppRadius.PILL)
-      .onClick(onClick)
-  }
-
-  @Builder
   private DataCard() {
     Column({ space: 12 }) {
       this.CardTitle('数据与管理', '快捷入口')
@@ -269,12 +161,6 @@ struct Settings {
       this.RouteRow('分类管理', '调整常用分类和排序', ROUTES.CATEGORY_MANAGE)
       this.RouteRow('账户管理', '新增、编辑账户余额', ROUTES.ACCOUNT_MANAGE)
       this.RouteRow('预算管理', '设置月度预算', ROUTES.BUDGET_SETTING)
-      if (FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
-        this.RouteRow('支付宝账单导入', '导入 CSV 并审核后入账', ROUTES.ALIPAY_IMPORT)
-      }
-      if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
-        this.RouteRow('主动识别记账', '截图 OCR 和待确认账单', ROUTES.AUTO_BOOKKEEPING)
-      }
       this.RouteRow('数据导出', '导出 CSV 和备份文件', ROUTES.DATA_EXPORT)
       this.RouteRow('关于', '版本和说明', ROUTES.ABOUT)
     }
@@ -395,10 +281,10 @@ struct Settings {
     const settings: AppSettingsData = {
       themeMode: this.themeMode,
       currencySymbol: this.currencySymbol.trim() || '¥',
-      autoBookkeepingEnabled: this.autoBookkeepingEnabled,
-      autoReviewEnabled: this.autoReviewEnabled,
-      autoDefaultAccountId: this.autoDefaultAccountId,
-      alipayBillImportEnabled: this.alipayBillImportEnabled
+      autoBookkeepingEnabled: false,
+      autoReviewEnabled: true,
+      autoDefaultAccountId: 0,
+      alipayBillImportEnabled: false
     };
     try {
       await this.repository.saveUserName(getContext(this), this.userName);
@@ -410,16 +296,6 @@ struct Settings {
     } catch (error) {
       ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
     }
-  }
-
-  private async toggleAlipayImportSetting(): Promise<void> {
-    this.alipayBillImportEnabled = !this.alipayBillImportEnabled;
-    await this.saveSettings(false);
-  }
-
-  private async toggleAutoBookkeepingSetting(): Promise<void> {
-    this.autoBookkeepingEnabled = !this.autoBookkeepingEnabled;
-    await this.saveSettings(false);
   }
 
   private async resetSettings(): Promise<void> {

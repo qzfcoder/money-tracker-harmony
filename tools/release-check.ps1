@@ -112,6 +112,32 @@ try {
     }
   }
 
+  if ($pagesJson -ne $null) {
+    $registeredPageSensitivePatterns = @(
+      '\u4E3B\u52A8\u8BC6\u522B',
+      '\u81EA\u52A8\u8BB0\u8D26',
+      '\bOCR\b',
+      '\u622A\u56FE\u8BC6\u522B',
+      '\u652F\u4ED8\u5B9D\u8D26\u5355\u5BFC\u5165',
+      '\u5F85\u786E\u8BA4',
+      '\u8BC6\u522B\u8D26\u5355',
+      '\u5BFC\u5165\u8D26\u5355',
+      'ROUTES\.AUTO_BOOKKEEPING',
+      'ROUTES\.ALIPAY_IMPORT'
+    )
+    foreach ($page in $pagesJson.src) {
+      $pageFile = Join-Path $etsRoot ($page + '.ets')
+      if (Test-Path $pageFile) {
+        foreach ($pattern in $registeredPageSensitivePatterns) {
+          $matches = Select-String -Path $pageFile -Pattern $pattern -ErrorAction SilentlyContinue
+          foreach ($match in $matches) {
+            Add-Failure "Registered page contains disabled release text '$pattern' at $($match.Path):$($match.LineNumber)"
+          }
+        }
+      }
+    }
+  }
+
   $sensitivePatterns = @(
     '隐私',
     '用户协议',
