@@ -262,20 +262,34 @@ struct RecordEdit {
 
   @Builder
   private TemplateChip(item: RecordTemplateModel) {
-    Column({ space: 4 }) {
-      Text(item.name)
+    Row({ space: 8 }) {
+      Column({ space: 4 }) {
+        Text(item.name)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+        Text(`${NumberUtil.money(item.amount)} · ${item.accountName || '账户'}`)
+          .fontSize(12)
+          .fontColor(AppColors.MUTED)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      .onClick(() => this.applyTemplate(item))
+
+      Button('×')
         .fontSize(14)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.INK)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
-      Text(`${NumberUtil.money(item.amount)} · ${item.accountName || '账户'}`)
-        .fontSize(12)
-        .fontColor(AppColors.MUTED)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
+        .fontColor(AppColors.EXPENSE)
+        .width(32)
+        .height(32)
+        .backgroundColor('#FCE9E4')
+        .borderRadius(16)
+        .onClick(() => this.deleteTemplate(item))
     }
     .alignItems(HorizontalAlign.Start)
     .width(this.isWide() ? '31%' : '48%')
@@ -285,7 +299,6 @@ struct RecordEdit {
     .backgroundColor(AppColors.SURFACE_SOFT)
     .border({ width: 1, color: item.categoryColor || AppColors.LINE })
     .borderRadius(16)
-    .onClick(() => this.applyTemplate(item))
   }
 
   @Builder
@@ -516,6 +529,19 @@ struct RecordEdit {
       ToastUtil.show('模板已保存');
     } catch (error) {
       ToastUtil.show('模板保存失败');
+    }
+  }
+
+  private async deleteTemplate(item: RecordTemplateModel): Promise<void> {
+    if (!item.id) {
+      return;
+    }
+    try {
+      await this.templateRepository.deleteById(item.id);
+      await this.loadTemplates();
+      ToastUtil.show('模板已删除');
+    } catch (error) {
+      ToastUtil.show('模板删除失败');
     }
   }
 

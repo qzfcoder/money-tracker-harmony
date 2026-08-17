@@ -69,6 +69,12 @@ export class RecordTemplateRepository {
     );
   }
 
+  async deleteById(id: number): Promise<void> {
+    const predicates = new relationalStore.RdbPredicates('t_record_template');
+    predicates.equalTo('id', id);
+    await this.store().delete(predicates);
+  }
+
   private async findSimilar(template: RecordTemplateModel): Promise<RecordTemplateModel | null> {
     const result = await this.store().querySql(
       `SELECT t.*, c.name AS category_name, c.color AS category_color, a.name AS account_name
