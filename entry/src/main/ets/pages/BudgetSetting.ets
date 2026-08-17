@@ -371,11 +371,12 @@ struct BudgetSetting {
               .fontWeight(FontWeight.Bold)
               .fontColor(AppColors.INK)
               .maxLines(1)
-            Text(`已用 ${NumberUtil.compactMoney(item.spent)}`)
+            Text(this.rowBudgetHint(item))
               .fontSize(12)
-              .fontColor(AppColors.MUTED)
+              .fontColor(this.rowProgress(item) >= 100 ? AppColors.EXPENSE : AppColors.MUTED)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
           }
           .alignItems(HorizontalAlign.Start)
         }
@@ -588,6 +589,18 @@ struct BudgetSetting {
       return 0;
     }
     return Math.min(100, Math.round(this.spentTotal / total * 100));
+  }
+
+  private rowBudgetHint(row: BudgetRow): string {
+    const budget = this.parseAmount(row.budgetText);
+    if (budget <= 0) {
+      return `已用 ${NumberUtil.compactMoney(row.spent)} · 未设预算`;
+    }
+    const diff = budget - row.spent;
+    if (diff < 0) {
+      return `已用 ${NumberUtil.compactMoney(row.spent)} · 超出 ${NumberUtil.compactMoney(Math.abs(diff))}`;
+    }
+    return `已用 ${NumberUtil.compactMoney(row.spent)} · 剩余 ${NumberUtil.compactMoney(diff)}`;
   }
 
   private remainingTotal(): number {
