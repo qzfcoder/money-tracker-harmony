@@ -72,6 +72,7 @@ export class AccountRepository {
     if (fallback > 0) {
       await this.store().executeSql('UPDATE t_record SET account_id = ? WHERE account_id = ?', [fallback, id]);
       await this.store().executeSql('UPDATE t_record SET transfer_account_id = ? WHERE transfer_account_id = ?', [fallback, id]);
+      await this.store().executeSql('UPDATE t_record_template SET account_id = ? WHERE account_id = ?', [fallback, id]);
     }
     const predicates = new relationalStore.RdbPredicates('t_account');
     predicates.equalTo('id', id);

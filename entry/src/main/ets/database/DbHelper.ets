@@ -76,6 +76,18 @@ export const CREATE_TABLE_SQL: string[] = [
     status INTEGER DEFAULT 0,
     create_time INTEGER NOT NULL,
     update_time INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS t_record_template (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    category_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    remark TEXT DEFAULT '',
+    use_count INTEGER DEFAULT 0,
+    create_time INTEGER NOT NULL,
+    update_time INTEGER NOT NULL
   )`
 ];
 
@@ -86,7 +98,9 @@ export const CREATE_INDEX_SQL: string[] = [
   'CREATE INDEX IF NOT EXISTS idx_budget_month ON t_budget(month)',
   'CREATE INDEX IF NOT EXISTS idx_auto_rule_type ON t_auto_rule(rule_type)',
   'CREATE INDEX IF NOT EXISTS idx_auto_bill_status ON t_auto_bill(status)',
-  'CREATE INDEX IF NOT EXISTS idx_auto_bill_time ON t_auto_bill(record_time)'
+  'CREATE INDEX IF NOT EXISTS idx_auto_bill_time ON t_auto_bill(record_time)',
+  'CREATE INDEX IF NOT EXISTS idx_record_template_type ON t_record_template(type)',
+  'CREATE INDEX IF NOT EXISTS idx_record_template_used ON t_record_template(use_count, update_time)'
 ];
 
 export class DbHelper {

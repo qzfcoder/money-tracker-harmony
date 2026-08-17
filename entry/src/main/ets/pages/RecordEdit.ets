@@ -3,9 +3,12 @@ import { CategoryIcon } from '../components/CategoryIcon';
 import { CategoryModel } from '../model/Category';
 import { AccountModel } from '../model/Account';
 import { RecordListItem, RecordModel, RecordType } from '../model/Record';
+import { RecordTemplateModel } from '../model/RecordTemplate';
+import { RecordTemplateRepository } from '../repository/RecordTemplateRepository';
 import { RecordViewModel } from '../viewmodel/RecordViewModel';
 import { AppState } from '../viewmodel/AppState';
 import { ToastUtil } from '../utils/ToastUtil';
+import { NumberUtil } from '../utils/NumberUtil';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
 
 interface RecordEditParams {
@@ -16,8 +19,11 @@ interface RecordEditParams {
 @Entry
 @Component
 struct RecordEdit {
+  private templateRepository: RecordTemplateRepository = new RecordTemplateRepository();
+
   @State vm: RecordViewModel = new RecordViewModel();
   @State amountText: string = '';
+  @State templates: RecordTemplateModel[] = [];
   @State viewportWidth: number = 0;
 
   aboutToAppear(): void {
@@ -28,6 +34,7 @@ struct RecordEdit {
         this.vm.recordTime = Number(params.recordTime);
       }
       this.amountText = this.vm.amountText;
+      this.loadTemplates();
     }).catch((error: Error) => {
       ToastUtil.show(ToastUtil.error(error, '账单初始化失败'));
     });
@@ -44,6 +51,7 @@ struct RecordEdit {
               Column({ space: 20 }) {
                 this.TypeSwitch()
                 this.AmountPanel()
+                this.TemplatePanel()
                 this.DateTimePanel()
                 this.RemarkPanel()
               }
@@ -62,6 +70,7 @@ struct RecordEdit {
             Column({ space: 20 }) {
               this.TypeSwitch()
               this.AmountPanel()
+              this.TemplatePanel()
               this.DateTimePanel()
               this.CategoryPanel()
               this.AccountPanel()
@@ -157,7 +166,7 @@ struct RecordEdit {
       .backgroundColor(this.vm.type === type ? AppColors.SURFACE : '#00000000')
       .shadow(this.vm.type === type ? { radius: 10, color: AppColors.SHADOW, offsetY: 4 } : { radius: 0, color: '#00000000', offsetY: 0 })
       .onClick(() => {
-        this.vm.switchType(type);
+        this.switchType(type);
       })
   }
 
@@ -205,6 +214,78 @@ struct RecordEdit {
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 22, color: AppColors.SHADOW, offsetY: 9 })
+  }
+
+  @Builder
+  private TemplatePanel() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('账单模板')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.INK)
+        Blank()
+        Button('保存当前')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .height(34)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.saveCurrentTemplate())
+      }
+      .width('100%')
+
+      if (this.templates.length === 0) {
+        Text('暂无模板')
+          .fontSize(13)
+          .fontColor(AppColors.MUTED)
+          .width('100%')
+          .height(40)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(AppColors.SURFACE_SOFT)
+          .borderRadius(16)
+      } else {
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+          ForEach(this.templates, (item: RecordTemplateModel) => {
+            this.TemplateChip(item)
+          }, (item: RecordTemplateModel) => `${item.id}`)
+        }
+        .width('100%')
+      }
+    }
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 22, color: AppColors.SHADOW, offsetY: 9 })
+  }
+
+  @Builder
+  private TemplateChip(item: RecordTemplateModel) {
+    Column({ space: 4 }) {
+      Text(item.name)
+        .fontSize(14)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+      Text(`${NumberUtil.money(item.amount)} · ${item.accountName || '账户'}`)
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width(this.isWide() ? '31%' : '48%')
+    .height(62)
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+    .margin({ right: this.isWide() ? 8 : 6, bottom: 8 })
+    .backgroundColor(AppColors.SURFACE_SOFT)
+    .border({ width: 1, color: item.categoryColor || AppColors.LINE })
+    .borderRadius(16)
+    .onClick(() => this.applyTemplate(item))
   }
 
   @Builder
@@ -371,6 +452,73 @@ struct RecordEdit {
     }
   }
 
+  private async switchType(type: RecordType.EXPENSE | RecordType.INCOME): Promise<void> {
+    if (this.vm.type === type) {
+      return;
+    }
+    await this.vm.switchType(type);
+    await this.loadTemplates();
+  }
+
+  private async loadTemplates(): Promise<void> {
+    try {
+      this.templates = await this.templateRepository.listByType(this.vm.type, 8);
+    } catch (error) {
+      this.templates = [];
+    }
+  }
+
+  private async applyTemplate(item: RecordTemplateModel): Promise<void> {
+    try {
+      if (item.type !== this.vm.type) {
+        await this.vm.switchType(item.type);
+      }
+      this.amountText = this.formatAmountInput(item.amount);
+      this.vm.remark = item.remark;
+      this.vm.selectedCategory = this.vm.categories.find((category: CategoryModel) => category.id === item.categoryId) || this.vm.selectedCategory;
+      this.vm.selectedAccount = this.vm.accounts.find((account: AccountModel) => account.id === item.accountId) || this.vm.selectedAccount;
+      if (item.id) {
+        await this.templateRepository.markUsed(item.id);
+      }
+      await this.loadTemplates();
+      ToastUtil.show('已套用模板');
+    } catch (error) {
+      ToastUtil.show('模板套用失败');
+    }
+  }
+
+  private async saveCurrentTemplate(): Promise<void> {
+    const amount = Number(this.normalizeAmount(this.amountText));
+    if (!amount || amount <= 0) {
+      ToastUtil.show('请输入正确金额');
+      return;
+    }
+    if (!this.vm.selectedCategory || !this.vm.selectedAccount) {
+      ToastUtil.show('请选择分类和账户');
+      return;
+    }
+    const now = Date.now();
+    const remark = this.vm.remark.trim();
+    const template: RecordTemplateModel = {
+      name: remark || this.vm.selectedCategory.name,
+      type: this.vm.type,
+      amount: Math.round(amount * 100) / 100,
+      categoryId: this.vm.selectedCategory.id || 0,
+      accountId: this.vm.selectedAccount.id || 0,
+      remark,
+      useCount: 0,
+      createTime: now,
+      updateTime: now
+    };
+    try {
+      await this.templateRepository.save(template);
+      await this.loadTemplates();
+      ToastUtil.show('模板已保存');
+    } catch (error) {
+      ToastUtil.show('模板保存失败');
+    }
+  }
+
   private applySavedRecord(record: RecordModel): void {
     if (!record.id || !this.vm.selectedCategory || !this.vm.selectedAccount) {
       return;
@@ -409,6 +557,11 @@ struct RecordEdit {
       return cleaned;
     }
     return `${parts[0]}.${parts.slice(1).join('').substring(0, 2)}`;
+  }
+
+  private formatAmountInput(value: number): string {
+    const amount = Math.round(value * 100) / 100;
+    return `${amount}`;
   }
 
   private showDatePicker(): void {
