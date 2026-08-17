@@ -52,6 +52,7 @@ try {
   $pagesPath = Join-Path $Root 'entry/src/main/resources/base/profile/main_pages.json'
   $stringsPath = Join-Path $Root 'entry/src/main/resources/base/element/string.json'
   $routesPath = Join-Path $Root 'entry/src/main/ets/constants/RouteConstants.ets'
+  $featureFlagsPath = Join-Path $Root 'entry/src/main/ets/constants/FeatureFlags.ets'
   $etsRoot = Join-Path $Root 'entry/src/main/ets'
 
   $module = Read-Json $modulePath
@@ -84,6 +85,18 @@ try {
         Add-Failure "Route is not registered in main_pages.json: $route"
       }
     }
+  }
+
+  if (Test-Path $featureFlagsPath) {
+    $featureFlagsText = Get-Content -Raw -Encoding UTF8 $featureFlagsPath
+    if ($featureFlagsText -notmatch 'AUTO_BOOKKEEPING_VISIBLE:\s*boolean\s*=\s*false') {
+      Add-Failure 'AUTO_BOOKKEEPING_VISIBLE must be false for this release'
+    }
+    if ($featureFlagsText -notmatch 'ALIPAY_BILL_IMPORT_VISIBLE:\s*boolean\s*=\s*false') {
+      Add-Failure 'ALIPAY_BILL_IMPORT_VISIBLE must be false for this release'
+    }
+  } else {
+    Add-Failure 'FeatureFlags.ets is missing'
   }
 
   $sensitivePatterns = @(
@@ -158,6 +171,7 @@ try {
   Write-Output "Integer-only inputs: $($numberMatches.Count) sort fields"
   Write-Output 'Permissions: empty'
   Write-Output 'Extensions: none'
+  Write-Output 'Release feature flags: safe'
   Write-Output 'Routes/pages: consistent'
 } finally {
   Pop-Location

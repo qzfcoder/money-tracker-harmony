@@ -133,7 +133,11 @@ struct About {
         .width('100%')
       this.PolicySection('数据说明', '一页账用于记录收支、预算、账户和统计数据。账单数据保存在应用数据区，用于页面展示、筛选、统计和导出。')
       this.PolicySection('文件处理', '导出 CSV 或报表时会调用系统文件选择器，由用户主动选择保存位置。')
-      this.PolicySection('主动识别', FeatureFlags.AUTO_BOOKKEEPING_VISIBLE ? '开启主动识别后，用户手动选择账单截图，OCR 文本仅在本机解析，识别结果先进入待确认账单，用户确认后才入账。' : '当前版本以手动记账、统计和导出为主。')
+      if (FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+        this.PolicySection('主动识别', '开启主动识别后，用户手动选择账单截图，OCR 文本仅在本机解析，识别结果先进入待确认账单，用户确认后才入账。')
+      } else {
+        this.PolicySection('本地使用', '当前版本以手动记账、统计和导出为主，账单数据用于本机页面展示和用户主动导出。')
+      }
       this.PolicySection('用户控制', '用户可以编辑、删除账单，导出 CSV 文件，也可以通过系统卸载应用清除应用数据。')
       Text('正式上架时，请在华为 AGC 控制台按应用市场要求配置对应说明链接，并保持内容与本页说明一致。')
         .fontSize(12)

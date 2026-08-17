@@ -1,5 +1,7 @@
 import { router } from '@kit.ArkUI';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
+import { FeatureFlags } from '../constants/FeatureFlags';
+import { PlaceholderPage } from '../components/PlaceholderPage';
 import { CategoryModel } from '../model/Category';
 import { AccountModel } from '../model/Account';
 import { AutoBillModel, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
@@ -70,6 +72,9 @@ struct AutoBookkeeping {
   private launchActionHandled: boolean = false;
 
   aboutToAppear(): void {
+    if (!FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+      return;
+    }
     this.readLaunchParams();
     this.loadAll().then(() => {
       this.handleLaunchAction();
@@ -77,44 +82,51 @@ struct AutoBookkeeping {
   }
 
   build() {
-    Column() {
-      this.Header()
+    if (!FeatureFlags.AUTO_BOOKKEEPING_VISIBLE) {
+      PlaceholderPage({
+        title: '当前版本未开放',
+        description: '发布版暂不开放主动识别入口，请使用手动记账、搜索、预算和数据导出功能。'
+      })
+    } else {
+      Column() {
+        this.Header()
 
-      Scroll() {
-        Column({ space: 18 }) {
-          this.SummaryCard()
-          this.TabSwitch()
-          if (this.activeTab === AutoPageTab.OCR) {
-            if (this.launchPromptVisible) {
-              this.LaunchActionCard()
+        Scroll() {
+          Column({ space: 18 }) {
+            this.SummaryCard()
+            this.TabSwitch()
+            if (this.activeTab === AutoPageTab.OCR) {
+              if (this.launchPromptVisible) {
+                this.LaunchActionCard()
+              }
+              this.OcrCaptureCard()
+              this.OcrResultCard()
+            } else if (this.activeTab === AutoPageTab.PENDING) {
+              this.TestCard()
+              this.PendingCard()
+            } else if (this.activeTab === AutoPageTab.RULES) {
+              this.RuleFormCard()
+              this.RuleListCard()
+            } else {
+              this.SourceSettingsCard()
+              this.DataCacheCard()
             }
-            this.OcrCaptureCard()
-            this.OcrResultCard()
-          } else if (this.activeTab === AutoPageTab.PENDING) {
-            this.TestCard()
-            this.PendingCard()
-          } else if (this.activeTab === AutoPageTab.RULES) {
-            this.RuleFormCard()
-            this.RuleListCard()
-          } else {
-            this.SourceSettingsCard()
-            this.DataCacheCard()
           }
+          .width('100%')
+          .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
+          .alignSelf(ItemAlign.Center)
+          .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 10, bottom: 28 })
         }
-        .width('100%')
-        .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
-        .alignSelf(ItemAlign.Center)
-        .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 10, bottom: 28 })
+        .layoutWeight(1)
+        .backgroundColor(AppColors.CANVAS)
       }
-      .layoutWeight(1)
+      .width('100%')
+      .height('100%')
       .backgroundColor(AppColors.CANVAS)
+      .onAreaChange((oldValue, newValue) => {
+        this.viewportWidth = parseFloat(`${newValue.width}`);
+      })
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.CANVAS)
-    .onAreaChange((oldValue, newValue) => {
-      this.viewportWidth = parseFloat(`${newValue.width}`);
-    })
   }
 
   @Builder

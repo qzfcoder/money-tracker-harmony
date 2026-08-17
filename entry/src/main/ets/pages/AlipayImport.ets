@@ -1,7 +1,9 @@
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { AppColors, AppRadius, AppSpace, LayoutSizes } from '../constants/DesignSystem';
+import { FeatureFlags } from '../constants/FeatureFlags';
 import { ROUTES } from '../constants/RouteConstants';
+import { PlaceholderPage } from '../components/PlaceholderPage';
 import { SettingsRepository } from '../repository/SettingsRepository';
 import { AlipayBillImportService, AlipayImportResult } from '../service/AlipayBillImportService';
 import { AutoBookkeepingService } from '../service/AutoBookkeepingService';
@@ -20,29 +22,39 @@ struct AlipayImport {
   @State lastSummary: string = '';
 
   aboutToAppear(): void {
+    if (!FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
+      return;
+    }
     this.loadState();
   }
 
   build() {
-    Column() {
-      this.Header()
-      Scroll() {
-        Column({ space: 16 }) {
-          this.StatusCard()
-          this.ImportCard()
-          this.GuideCard()
+    if (!FeatureFlags.ALIPAY_BILL_IMPORT_VISIBLE) {
+      PlaceholderPage({
+        title: '当前版本未开放',
+        description: '发布版暂不开放账单导入入口，请使用手动记账、搜索、预算和数据导出功能。'
+      })
+    } else {
+      Column() {
+        this.Header()
+        Scroll() {
+          Column({ space: 16 }) {
+            this.StatusCard()
+            this.ImportCard()
+            this.GuideCard()
+          }
+          .width('100%')
+          .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
+          .alignSelf(ItemAlign.Center)
+          .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 10, bottom: 28 })
         }
-        .width('100%')
-        .constraintSize({ maxWidth: LayoutSizes.CONTENT_MAX })
-        .alignSelf(ItemAlign.Center)
-        .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 10, bottom: 28 })
+        .layoutWeight(1)
+        .backgroundColor(AppColors.CANVAS)
       }
-      .layoutWeight(1)
+      .width('100%')
+      .height('100%')
       .backgroundColor(AppColors.CANVAS)
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.CANVAS)
   }
 
   @Builder
