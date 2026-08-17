@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmony Release Testing"
+  short_description: "Run release-safe checks for this HarmonyOS bookkeeping app."
+  default_prompt: "Test this HarmonyOS project for release blockers."
