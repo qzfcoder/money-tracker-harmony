@@ -28,6 +28,24 @@ function Assert-NoMatches([string]$name, [string]$path, [string[]]$patterns) {
   }
 }
 
+function Assert-DecimalInput([string]$file, [string]$binding) {
+  if (-not (Test-Path $file)) {
+    Add-Failure "Decimal input file missing: $file"
+    return
+  }
+  $text = Get-Content -Raw -Encoding UTF8 $file
+  $escapedBinding = [regex]::Escape($binding)
+  $pattern = "TextInput\s*\(\s*\{\s*text:\s*$escapedBinding[\s\S]*?\.onChange"
+  $match = [regex]::Match($text, $pattern)
+  if (-not $match.Success) {
+    Add-Failure "Decimal input binding not found: $binding in $file"
+    return
+  }
+  if ($match.Value -notmatch 'InputType\.NUMBER_DECIMAL') {
+    Add-Failure "Decimal input missing NUMBER_DECIMAL: $binding in $file"
+  }
+}
+
 Push-Location $Root
 try {
   $modulePath = Join-Path $Root 'entry/src/main/module.json5'
@@ -93,8 +111,8 @@ try {
 
   $etsFiles = Get-ChildItem -Path $etsRoot -Recurse -File -Filter '*.ets'
   $decimalMatches = $etsFiles | Select-String -Pattern 'InputType\.NUMBER_DECIMAL'
-  if ($decimalMatches.Count -lt 6) {
-    Add-Failure "Expected at least 6 decimal amount inputs, found $($decimalMatches.Count)"
+  if ($decimalMatches.Count -lt 7) {
+    Add-Failure "Expected at least 7 decimal amount inputs, found $($decimalMatches.Count)"
   }
 
   $numberMatches = $etsFiles | Select-String -Pattern 'InputType\.Number\b' -CaseSensitive
@@ -103,6 +121,14 @@ try {
       Add-Failure "Unexpected integer-only input outside sort fields: $($match.Path):$($match.LineNumber)"
     }
   }
+
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/components/AmountInput.ets') 'this.amountText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/RecordEdit.ets') 'this.amountText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/AccountManage.ets') 'this.balanceText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/AccountManage.ets') 'this.initialText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/BudgetSetting.ets') 'this.totalBudgetText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/BudgetSetting.ets') 'item.budgetText'
+  Assert-DecimalInput (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'this.editingAmountText'
 
   $deletedFiles = @(
     'entry/src/main/ets/extension/NotificationBookkeepingSubscriber.ets',

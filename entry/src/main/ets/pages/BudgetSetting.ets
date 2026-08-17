@@ -150,6 +150,7 @@ struct BudgetSetting {
             .fontSize(13)
             .fontColor(AppColors.MUTED)
           TextInput({ text: this.totalBudgetText, placeholder: '0.00' })
+            .type(InputType.NUMBER_DECIMAL)
             .height(52)
             .fontSize(26)
             .fontWeight(FontWeight.Bold)
