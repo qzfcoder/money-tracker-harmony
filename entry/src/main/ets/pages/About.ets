@@ -92,7 +92,7 @@ struct About {
   @Builder
   private InfoCard() {
     Column({ space: 12 }) {
-      this.InfoRow('版本', '1.0.1')
+      this.InfoRow('版本', '1.0.2')
       this.InfoRow('数据结构', '账单 / 分类 / 账户 / 预算')
       this.InfoRow('系统能力', '按需调用')
       this.InfoRow('数据导出', '支持 CSV 文件')
