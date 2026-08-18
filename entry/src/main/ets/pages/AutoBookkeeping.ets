@@ -4,7 +4,7 @@ import { FeatureFlags } from '../constants/FeatureFlags';
 import { PlaceholderPage } from '../components/PlaceholderPage';
 import { CategoryModel } from '../model/Category';
 import { AccountModel } from '../model/Account';
-import { AutoBillModel, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
+import { AutoBillModel, AutoParseResult, AutoRuleModel, AutoRuleType } from '../model/AutoBookkeeping';
 import { RecordType } from '../model/Record';
 import { AccountRepository } from '../repository/AccountRepository';
 import { CategoryRepository } from '../repository/CategoryRepository';
@@ -651,12 +651,10 @@ struct AutoBookkeeping {
     Column({ space: 14 }) {
       this.CardTitle('识别设置', this.autoEnabled ? '已开启' : '未开启')
       this.ToggleRow('自动记账总开关', '关闭后不进行截图识别和待确认缓存。', this.autoEnabled, () => {
-        this.autoEnabled = !this.autoEnabled;
-        this.saveSettings();
+        this.toggleAutoEnabled();
       })
       this.ToggleRow('自动记账校验开关', '开启后所有识别结果先进入待确认账单。', this.reviewEnabled, () => {
-        this.reviewEnabled = !this.reviewEnabled;
-        this.saveSettings();
+        this.toggleReviewEnabled();
       })
       Text('发布版采用用户主动触发：手动选择账单截图后，本机 OCR 识别结果先进入待确认。')
         .fontSize(12)
@@ -719,12 +717,12 @@ struct AutoBookkeeping {
         .textAlign(TextAlign.Center)
         .backgroundColor(enabled ? AppColors.CHART_BLUE : AppColors.SURFACE_SOFT)
         .borderRadius(AppRadius.PILL)
-        .onClick(onClick)
     }
     .width('100%')
     .padding(14)
     .backgroundColor(AppColors.SURFACE_SOFT)
     .borderRadius(18)
+    .onClick(onClick)
   }
 
   @Builder
@@ -953,8 +951,10 @@ struct AutoBookkeeping {
       this.syncSettings(settings);
       this.categories = await this.categoryRepository.listAll();
       this.accounts = await this.accountRepository.list();
-      this.rules = await service.listRules();
-      this.pendingBills = await service.listPending(50, 0);
+      const rules = await service.listRules();
+      const pendingBills = await service.listPending(50, 0);
+      this.rules = rules.slice();
+      this.pendingBills = pendingBills.slice();
       this.pickFirstCategory();
       await AppState.getInstance().refreshPendingAutoBills();
     } catch (error) {
@@ -971,7 +971,18 @@ struct AutoBookkeeping {
     this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
   }
 
-  private async saveSettings(): Promise<void> {
+  private async refreshRecognitionState(): Promise<void> {
+    const service = AutoBookkeepingService.create(getContext(this));
+    const settings = await this.settingsRepository.load(getContext(this));
+    this.syncSettings(settings);
+    const rules = await service.listRules();
+    const pendingBills = await service.listPending(50, 0);
+    this.rules = rules.slice();
+    this.pendingBills = pendingBills.slice();
+    await AppState.getInstance().refreshPendingAutoBills();
+  }
+
+  private async saveSettings(showToast: boolean = true): Promise<void> {
     const settings: AppSettingsData = {
       themeMode: this.themeMode,
       currencySymbol: this.currencySymbol,
@@ -981,7 +992,35 @@ struct AutoBookkeeping {
       alipayBillImportEnabled: this.alipayBillImportEnabled
     };
     await this.settingsRepository.save(getContext(this), settings);
-    ToastUtil.show('自动记账设置已保存');
+    if (showToast) {
+      ToastUtil.show('自动记账设置已保存');
+    }
+  }
+
+  private async toggleAutoEnabled(): Promise<void> {
+    const previous = this.autoEnabled;
+    this.autoEnabled = !previous;
+    try {
+      await this.saveSettings(false);
+      await this.refreshRecognitionState();
+      ToastUtil.show('自动记账设置已保存');
+    } catch (error) {
+      this.autoEnabled = previous;
+      ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
+    }
+  }
+
+  private async toggleReviewEnabled(): Promise<void> {
+    const previous = this.reviewEnabled;
+    this.reviewEnabled = !previous;
+    try {
+      await this.saveSettings(false);
+      await this.refreshRecognitionState();
+      ToastUtil.show('自动记账设置已保存');
+    } catch (error) {
+      this.reviewEnabled = previous;
+      ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
+    }
   }
 
   private async previewText(): Promise<void> {
@@ -1033,13 +1072,12 @@ struct AutoBookkeeping {
       const preview = await AutoBookkeepingService.create(getContext(this)).preview(this.ocrText);
       if (preview.matched && preview.bill) {
         this.ocrSummary = `识别结果：${this.typeMark(preview.bill.type)} ${NumberUtil.money(preview.bill.amount)} · ${preview.bill.categoryName || '未分类'} · ${preview.bill.accountName || '默认账户'}`;
+        this.ocrRecordTime = recordTime > 0 ? recordTime : Date.now();
+        await this.enqueueOcrPending(this.ocrRecordTime);
       } else {
         this.ocrSummary = '已识别文字，但未解析到账单金额，可检查截图或补充规则';
       }
       ToastUtil.show('OCR 识别完成');
-      if (recordTime > 0) {
-        this.ocrRecordTime = recordTime;
-      }
     } catch (error) {
       this.ocrText = '';
       this.ocrSummary = `${ToastUtil.error(error, 'OCR 识别失败')}。当前设备可能未开放本机 OCR 能力，可在“待确认”页粘贴账单文字继续识别。`;
@@ -1059,17 +1097,24 @@ struct AutoBookkeeping {
       return;
     }
     const eventTime = this.ocrRecordTime > 0 ? this.ocrRecordTime : Date.now();
-    const result = await AutoBookkeepingService.create(getContext(this)).captureOcrText(this.ocrText, eventTime);
+    const result = await this.enqueueOcrPending(eventTime);
     if (result.matched) {
-      this.ocrText = '';
-      this.ocrSummary = '';
-      this.ocrRecordTime = 0;
-      await this.loadAll();
-      this.activeTab = AutoPageTab.PENDING;
       ToastUtil.show('已加入待确认');
     } else {
       ToastUtil.show('未识别到账单');
     }
+  }
+
+  private async enqueueOcrPending(eventTime: number): Promise<AutoParseResult> {
+    const result = await AutoBookkeepingService.create(getContext(this)).captureOcrText(this.ocrText, eventTime);
+    if (result.matched) {
+      this.ocrText = '';
+      this.ocrSummary = '已识别并加入待确认账单';
+      this.ocrRecordTime = 0;
+      await this.refreshRecognitionState();
+      this.activeTab = AutoPageTab.PENDING;
+    }
+    return result;
   }
 
   private async confirm(item: AutoBillModel): Promise<void> {

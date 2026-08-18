@@ -235,6 +235,8 @@ try {
   Assert-FileMatches 'Search result CSV export' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'saveSearchCsv'
   Assert-FileMatches 'Search result CSV export write mode' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'OpenMode\.READ_WRITE\s*\|\s*fileIo\.OpenMode\.TRUNC'
   Assert-FileMatches 'Calendar month insight' (Join-Path $Root 'entry/src/main/ets/pages/Calendar.ets') 'monthInsight'
+  Assert-FileMatches 'Auto bookkeeping setting refresh' (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'toggleAutoEnabled'
+  Assert-FileMatches 'Auto bookkeeping OCR enqueue refresh' (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'enqueueOcrPending'
 
   $deletedFiles = @(
     'entry/src/main/ets/extension/NotificationBookkeepingSubscriber.ets',
