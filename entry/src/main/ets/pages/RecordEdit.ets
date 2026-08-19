@@ -297,7 +297,7 @@ struct RecordEdit {
         .borderRadius(16)
         .onClick(() => this.deleteTemplate(item))
     }
-    .alignItems(HorizontalAlign.Start)
+    .alignItems(VerticalAlign.Top)
     .width(this.isWide() ? '31%' : '48%')
     .height(62)
     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
