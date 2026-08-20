@@ -724,7 +724,7 @@ struct Index {
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
           ForEach(this.appState.accountList, (account: AccountModel) => {
             this.AssetCard(account)
-          }, (account: AccountModel) => `${account.id}`)
+          }, (account: AccountModel) => this.accountRenderKey(account))
         }
         .width('100%')
       }
@@ -1151,6 +1151,11 @@ struct Index {
 
   private avatarText(): string {
     return this.displayName().substring(0, 1);
+  }
+
+  private accountRenderKey(account: AccountModel): string {
+    const balanceCent = Math.round(account.balance * 100);
+    return `${account.id}-${account.name}-${account.type}-${balanceCent}-${account.isLiability ? 1 : 0}-${account.sortOrder}-${account.color}`;
   }
 
   private async refreshHomeMetrics(): Promise<void> {

@@ -15,6 +15,10 @@ struct Assets {
     this.vm.refresh();
   }
 
+  onPageShow(): void {
+    this.vm.refresh();
+  }
+
   build() {
     Column() {
       Scroll() {
@@ -182,7 +186,7 @@ struct Assets {
     Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
       ForEach(this.vm.accounts, (item: AccountModel) => {
         this.AccountCard(item)
-      }, (item: AccountModel) => `${item.id}`)
+      }, (item: AccountModel) => this.accountRenderKey(item))
     }
     .width('100%')
   }
@@ -236,6 +240,11 @@ struct Assets {
 
   private contentMaxWidth(): number {
     return this.viewportWidth >= Breakpoints.DESKTOP ? LayoutSizes.CONTENT_MAX : LayoutSizes.CONTENT_COMPACT;
+  }
+
+  private accountRenderKey(account: AccountModel): string {
+    const balanceCent = Math.round(account.balance * 100);
+    return `${account.id}-${account.name}-${account.type}-${balanceCent}-${account.isLiability ? 1 : 0}-${account.sortOrder}-${account.color}`;
   }
 
   private assetInsight(): string {

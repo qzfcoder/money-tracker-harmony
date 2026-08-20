@@ -235,6 +235,10 @@ try {
   Assert-FileMatches 'Search result CSV export' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'saveSearchCsv'
   Assert-FileMatches 'Search result CSV export write mode' (Join-Path $Root 'entry/src/main/ets/pages/Search.ets') 'OpenMode\.READ_WRITE\s*\|\s*fileIo\.OpenMode\.TRUNC'
   Assert-FileMatches 'Calendar month insight' (Join-Path $Root 'entry/src/main/ets/pages/Calendar.ets') 'monthInsight'
+  Assert-FileMatches 'Index asset account render key' (Join-Path $Root 'entry/src/main/ets/pages/Index.ets') 'accountRenderKey\(account\)'
+  Assert-FileMatches 'Index asset balance render key' (Join-Path $Root 'entry/src/main/ets/pages/Index.ets') 'balanceCent'
+  Assert-FileMatches 'Assets page show refresh' (Join-Path $Root 'entry/src/main/ets/pages/Assets.ets') 'onPageShow\(\):\s*void\s*\{[\s\S]*?this\.vm\.refresh\(\)'
+  Assert-FileMatches 'Assets account balance render key' (Join-Path $Root 'entry/src/main/ets/pages/Assets.ets') 'balanceCent'
   Assert-FileMatches 'Auto bookkeeping setting refresh' (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'toggleAutoEnabled'
   Assert-FileMatches 'Auto bookkeeping OCR enqueue refresh' (Join-Path $Root 'entry/src/main/ets/pages/AutoBookkeeping.ets') 'enqueueOcrPending'
 
