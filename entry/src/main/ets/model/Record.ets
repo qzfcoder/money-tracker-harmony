@@ -12,6 +12,7 @@ export interface RecordModel {
   accountId: number;
   transferAccountId?: number;
   recordTime: number;
+  ledgerName: string;
   remark: string;
   createTime: number;
   updateTime: number;
@@ -22,5 +23,5 @@ export interface RecordListItem extends RecordModel {
   categoryIcon: string;
   categoryColor: string;
   accountName: string;
+  transferAccountName?: string;
 }
-

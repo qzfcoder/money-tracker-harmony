@@ -153,8 +153,8 @@ struct CalendarPage {
   private MonthOverview() {
     Column({ space: 8 }) {
       Row({ space: 8 }) {
-        this.SummaryMetric('收入', () => this.monthIncome, AppColors.INCOME, '#E6F7EF')
-        this.SummaryMetric('支出', () => this.monthExpense, AppColors.EXPENSE, '#FFEAF0')
+        this.SummaryMetric('收入', () => this.monthIncome, AppColors.INCOME, AppColors.softGreen())
+        this.SummaryMetric('支出', () => this.monthExpense, AppColors.EXPENSE, AppColors.softPink())
         this.SummaryMetric('结余', () => this.monthBalance, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
       }
       .width('100%')
@@ -254,7 +254,7 @@ struct CalendarPage {
     .height(this.isNarrow() ? 46 : 60)
     .justifyContent(FlexAlign.Center)
     .opacity(item.currentMonth ? 1 : 0.35)
-    .backgroundColor(this.isSelected(item.timestamp) ? '#EDF5FF' : '#00000000')
+    .backgroundColor(this.isSelected(item.timestamp) ? AppColors.SURFACE_TINT : '#00000000')
     .borderRadius(12)
     .onClick(() => this.selectDay(item.timestamp))
   }
@@ -341,7 +341,7 @@ struct CalendarPage {
         .width(40)
         .height(40)
         .textAlign(TextAlign.Center)
-        .backgroundColor(item.type === RecordType.INCOME ? '#E6F7EF' : '#F2F7FC')
+        .backgroundColor(item.type === RecordType.INCOME ? AppColors.softGreen() : AppColors.SURFACE_SOFT)
         .borderRadius(14)
       Column({ space: 3 }) {
         Text(item.categoryName)

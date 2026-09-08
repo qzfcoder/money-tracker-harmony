@@ -7,6 +7,14 @@
     {
       "name": "entry_desc",
       "value": "一页账入口"
+    },
+    {
+      "name": "spending_card_name",
+      "value": "一页账"
+    },
+    {
+      "name": "spending_card_desc",
+      "value": "展示今日支出和本月支出"
     }
   ]
 }

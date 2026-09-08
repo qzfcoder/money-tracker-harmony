@@ -6,6 +6,10 @@ import { PieChart } from './PieChart';
 import { AppColors, AppRadius, AppSpace, Breakpoints, LayoutSizes } from '../constants/DesignSystem';
 import { CategoryRankItem, PeriodOption, StatisticsPeriod, StatisticsViewModel } from '../viewmodel/StatisticsViewModel';
 import { TrendPoint } from '../repository/RecordRepository';
+import { SalaryInsight, SalarySettingsData } from '../model/Salary';
+import { SalaryRepository } from '../repository/SalaryRepository';
+import { LedgerEnhancementRepository } from '../repository/LedgerEnhancementRepository';
+import { SalaryInsightService } from '../service/SalaryInsightService';
 import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
 import { StatisticsPdfExporter, StatisticsPdfReport } from '../utils/StatisticsPdfExporter';
@@ -25,6 +29,9 @@ enum TrendChartMode {
 
 @Component
 export struct StatisticsDashboard {
+  private salaryRepository: SalaryRepository = new SalaryRepository();
+  private ledgerRepository: LedgerEnhancementRepository = new LedgerEnhancementRepository();
+
   @Prop showHeader: boolean = true;
   @Prop @Watch('onActiveChanged') active: boolean = true;
   @Prop @Watch('onRefreshKeyChanged') refreshKey: number = 0;
@@ -36,7 +43,10 @@ export struct StatisticsDashboard {
   @State balance: number = 0;
   @State categoryRanks: CategoryRankItem[] = [];
   @State trendPoints: TrendPoint[] = [];
+  @State salarySettings: SalarySettingsData = new SalaryRepository().defaultSettings();
+  @State salaryInsight: SalaryInsight = new SalaryInsight();
   @State dataRangeLabel: string = '';
+  @State activeLedger: string = '日常账本';
   @State customEditorVisible: boolean = false;
   @State draftCustomStartTime: number = DateUtil.addDays(DateUtil.startOfDay(), -29);
   @State draftCustomEndTime: number = DateUtil.startOfDay();
@@ -65,6 +75,7 @@ export struct StatisticsDashboard {
         this.PeriodSwitch()
         this.RangeToolbar()
         this.SummaryCard()
+        this.SalaryRelationCard()
         this.DimensionOverview()
         this.ChartGrid()
       }
@@ -174,6 +185,32 @@ export struct StatisticsDashboard {
           })
       }
       .width('100%')
+
+      Row({ space: 6 }) {
+        Text('账')
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+          .width(24)
+          .height(24)
+          .textAlign(TextAlign.Center)
+          .borderRadius(12)
+          .backgroundColor(AppColors.CHART_BLUE)
+        Text(this.activeLedger)
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text('统计范围')
+          .fontSize(12)
+          .fontColor(AppColors.MUTED)
+      }
+      .padding({ left: 10, right: 12, top: 7, bottom: 7 })
+      .backgroundColor(AppColors.softBlue())
+      .border({ width: 1, color: AppColors.LINE })
+      .borderRadius(AppRadius.PILL)
+      .alignSelf(ItemAlign.Start)
 
       if (this.customEditorVisible) {
         Column({ space: 10 }) {
@@ -385,6 +422,87 @@ export struct StatisticsDashboard {
       .width('100%')
     }
     .width('100%')
+  }
+
+  @Builder
+  private SalaryRelationCard() {
+    if (this.salarySettings.enabled) {
+      Column({ space: 12 }) {
+        Row() {
+          Text('收入节奏')
+            .fontSize(this.isPhone() ? 18 : 20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.INK)
+          Blank()
+          Text(this.salaryProgressTag())
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.salaryPressureColor())
+            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+            .backgroundColor(this.salaryPressureBgColor())
+            .borderRadius(AppRadius.PILL)
+        }
+        .width('100%')
+
+        Row({ space: 8 }) {
+          this.SalaryTile(this.salaryIncomeLabel(), NumberUtil.compactMoney(this.salaryInsight.earnedToDate), AppColors.CHART_GREEN, this.salaryMetricBg(0))
+          this.SalaryTile('本期支出', NumberUtil.compactMoney(this.expense), AppColors.CHART_PINK, this.salaryMetricBg(1))
+          this.SalaryTile('支出占比', `${this.salaryInsight.expenseRate}%`, this.salaryPressureColor(), this.salaryMetricBg(2))
+        }
+        .width('100%')
+
+        Text(this.salaryRelationHint())
+          .fontSize(13)
+          .fontColor(AppColors.MUTED)
+          .lineHeight(20)
+          .width('100%')
+          .maxLines(2)
+      }
+      .width('100%')
+      .padding(this.isPhone() ? 14 : 18)
+      .backgroundColor(AppColors.SURFACE)
+      .borderRadius(AppRadius.CARD)
+      .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+    }
+  }
+
+  @Builder
+  private SalaryTile(label: string, value: string, color: string, bgColor: string) {
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        Column()
+          .width('100%')
+          .height(4)
+          .backgroundColor(color)
+          .borderRadius(2)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 8 })
+
+      Column({ space: 4 }) {
+        Text(label)
+          .fontSize(11)
+          .fontColor(AppColors.MUTED)
+          .maxLines(1)
+        Text(value)
+          .fontSize(this.salaryValueFontSize(value))
+          .fontWeight(FontWeight.Bold)
+          .fontColor(color)
+          .width('100%')
+          .textAlign(TextAlign.Center)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({ left: 8, right: 8, top: 10 })
+    }
+    .layoutWeight(1)
+    .height(this.isPhone() ? 60 : 66)
+    .backgroundColor(bgColor)
+    .borderRadius(16)
+    .border({ width: 1, color: AppColors.LINE })
   }
 
   @Builder
@@ -787,7 +905,8 @@ export struct StatisticsDashboard {
   private async exportPdf(): Promise<void> {
     try {
       const report = new StatisticsPdfReport();
-      report.rangeLabel = this.dataRangeLabel || DateUtil.rangeLabel(DateUtil.startOfMonth(), DateUtil.startOfNextMonth());
+      const rangeLabel = this.dataRangeLabel || DateUtil.rangeLabel(DateUtil.startOfMonth(), DateUtil.startOfNextMonth());
+      report.rangeLabel = `${this.activeLedger} · ${rangeLabel}`;
       report.income = this.income;
       report.expense = this.expense;
       report.balance = this.balance;
@@ -812,6 +931,9 @@ export struct StatisticsDashboard {
   private async refreshData(): Promise<void> {
     try {
       await AppDatabase.getInstance().init(getContext(this));
+      const ledgerFilter = await this.ledgerRepository.getHomeLedgerFilter(getContext(this));
+      this.activeLedger = ledgerFilter.length > 0 ? ledgerFilter : '全部账本';
+      this.vm.setLedgerName(ledgerFilter);
       await this.vm.refresh();
       this.income = this.vm.income;
       this.expense = this.vm.expense;
@@ -819,6 +941,9 @@ export struct StatisticsDashboard {
       this.categoryRanks = this.vm.categoryRanks.slice();
       this.trendPoints = this.vm.trendPoints.slice();
       this.dataRangeLabel = this.vm.rangeLabel;
+      this.salarySettings = await this.salaryRepository.load(getContext(this));
+      this.salaryInsight = SalaryInsightService.buildForRange(this.salarySettings, this.expense,
+        this.vm.rangeStartTime, this.vm.rangeEndTime, this.statisticsSalaryTime());
     } catch (error) {
       ToastUtil.show('统计数据加载失败，请稍后重试');
     }
@@ -892,5 +1017,87 @@ export struct StatisticsDashboard {
     this.categoryRanks = this.vm.categoryRanks.slice();
     this.trendPoints = this.vm.trendPoints.slice();
     this.dataRangeLabel = this.vm.rangeLabel;
+    this.salaryInsight = SalaryInsightService.buildForRange(this.salarySettings, this.expense,
+      this.vm.rangeStartTime, this.vm.rangeEndTime, this.statisticsSalaryTime());
+  }
+
+  private statisticsSalaryTime(): number {
+    if (this.vm.rangeEndTime <= 0) {
+      return Date.now();
+    }
+    return Math.min(Date.now(), this.vm.rangeEndTime - 1);
+  }
+
+  private salaryIncomeLabel(): string {
+    const todayStart = DateUtil.startOfDay();
+    if (this.vm.rangeEndTime <= todayStart) {
+      return '本期工资';
+    }
+    if (this.vm.rangeStartTime > todayStart) {
+      return '预计工资';
+    }
+    return '已赚工资';
+  }
+
+  private salaryRelationHint(): string {
+    const estimateText = `本期预计工资 ${NumberUtil.compactMoney(this.salaryInsight.monthlyIncome)}`;
+    const workTimeText = SalaryInsightService.workTimeText(this.expense, this.salaryInsight.hourlyIncome);
+    if (this.vm.period === StatisticsPeriod.YEAR) {
+      return `${estimateText}，当前支出约占 ${this.salaryIncomeLabel()} ${this.salaryInsight.expenseRate}%。`;
+    }
+    if (this.vm.period === StatisticsPeriod.QUARTER) {
+      return `${estimateText}，本期支出约等于 ${workTimeText} 工作收入。`;
+    }
+    return `按当前工资设置，本期支出约等于 ${workTimeText} 工作收入。`;
+  }
+
+  private salaryPressureColor(): string {
+    if (this.salaryInsight.expenseRate <= 50) {
+      return AppColors.CHART_GREEN;
+    }
+    if (this.salaryInsight.expenseRate <= 80) {
+      return AppColors.CHART_BLUE;
+    }
+    if (this.salaryInsight.expenseRate <= 100) {
+      return AppColors.WARNING;
+    }
+    return AppColors.EXPENSE;
+  }
+
+  private salaryPressureBgColor(): string {
+    if (this.salaryInsight.expenseRate <= 50) {
+      return AppColors.softGreen();
+    }
+    if (this.salaryInsight.expenseRate <= 80) {
+      return AppColors.softBlue();
+    }
+    if (this.salaryInsight.expenseRate <= 100) {
+      return AppColors.softYellow();
+    }
+    return AppColors.softPink();
+  }
+
+  private salaryProgressTag(): string {
+    if (this.salaryInsight.monthlyIncome > 0) {
+      return SalaryInsightService.pressureLabel(this.salaryInsight.expenseRate);
+    }
+    return '待配置';
+  }
+
+  private salaryValueFontSize(value: string): number {
+    if (value.length <= 8) {
+      return this.isPhone() ? 14 : 16;
+    }
+    if (value.length <= 10) {
+      return this.isPhone() ? 13 : 15;
+    }
+    return 12;
+  }
+
+  private salaryMetricBg(index: number): string {
+    const light: string[] = ['#F2FBF7', '#FFF4F7', '#F3F8FF'];
+    const dark: string[] = ['#172B25', '#321F29', '#1B2A40'];
+    const palette = AppColors.IS_DARK ? dark : light;
+    return palette[index % palette.length];
   }
 }

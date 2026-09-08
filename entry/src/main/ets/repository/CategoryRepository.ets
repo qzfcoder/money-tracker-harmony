@@ -50,6 +50,7 @@ export class CategoryRepository {
     if (fallback > 0) {
       await this.store().executeSql('UPDATE t_record SET category_id = ? WHERE category_id = ?', [fallback, id]);
       await this.store().executeSql('UPDATE t_record_template SET category_id = ? WHERE category_id = ?', [fallback, id]);
+      await this.store().executeSql('UPDATE t_recurring_bill SET category_id = ? WHERE category_id = ?', [fallback, id]);
     }
     const predicates = new relationalStore.RdbPredicates('t_category');
     predicates.equalTo('id', id);

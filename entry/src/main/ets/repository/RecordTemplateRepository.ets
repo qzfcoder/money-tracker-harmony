@@ -10,10 +10,12 @@ export class RecordTemplateRepository {
 
   async listByType(type: RecordType.EXPENSE | RecordType.INCOME, limit: number = 8): Promise<RecordTemplateModel[]> {
     const result = await this.store().querySql(
-      `SELECT t.*, c.name AS category_name, c.color AS category_color, a.name AS account_name
+      `SELECT t.*, COALESCE(c.name, '分类已删除') AS category_name,
+        COALESCE(c.color, '#9AA4B2') AS category_color,
+        COALESCE(a.name, '账户已删除') AS account_name
       FROM t_record_template t
-      JOIN t_category c ON t.category_id = c.id
-      JOIN t_account a ON t.account_id = a.id
+      LEFT JOIN t_category c ON t.category_id = c.id
+      LEFT JOIN t_account a ON t.account_id = a.id
       WHERE t.type = ?
       ORDER BY t.use_count DESC, t.update_time DESC, t.id DESC
       LIMIT ?`,
@@ -25,6 +27,69 @@ export class RecordTemplateRepository {
     }
     result.close();
     return list;
+  }
+
+  async listAll(limit: number = 12): Promise<RecordTemplateModel[]> {
+    const result = await this.store().querySql(
+      `SELECT t.*, COALESCE(c.name, '分类已删除') AS category_name,
+        COALESCE(c.color, '#9AA4B2') AS category_color,
+        COALESCE(a.name, '账户已删除') AS account_name
+      FROM t_record_template t
+      LEFT JOIN t_category c ON t.category_id = c.id
+      LEFT JOIN t_account a ON t.account_id = a.id
+      ORDER BY t.use_count DESC, t.update_time DESC, t.id DESC
+      LIMIT ?`,
+      [limit]
+    );
+    const list: RecordTemplateModel[] = [];
+    while (result.goToNextRow()) {
+      list.push(this.fromResult(result));
+    }
+    result.close();
+    return list;
+  }
+
+  async countByType(type: RecordType.EXPENSE | RecordType.INCOME): Promise<number> {
+    const result = await this.store().querySql(
+      'SELECT COUNT(1) AS count FROM t_record_template WHERE type = ?',
+      [type]
+    );
+    let count = 0;
+    if (result.goToFirstRow()) {
+      count = result.getLong(result.getColumnIndex('count'));
+    }
+    result.close();
+    return count;
+  }
+
+  async countAll(): Promise<number> {
+    const result = await this.store().querySql('SELECT COUNT(1) AS count FROM t_record_template');
+    let count = 0;
+    if (result.goToFirstRow()) {
+      count = result.getLong(result.getColumnIndex('count'));
+    }
+    result.close();
+    return count;
+  }
+
+  async findById(id: number): Promise<RecordTemplateModel | null> {
+    const result = await this.store().querySql(
+      `SELECT t.*, COALESCE(c.name, '分类已删除') AS category_name,
+        COALESCE(c.color, '#9AA4B2') AS category_color,
+        COALESCE(a.name, '账户已删除') AS account_name
+      FROM t_record_template t
+      LEFT JOIN t_category c ON t.category_id = c.id
+      LEFT JOIN t_account a ON t.account_id = a.id
+      WHERE t.id = ?
+      LIMIT 1`,
+      [id]
+    );
+    let item: RecordTemplateModel | null = null;
+    if (result.goToFirstRow()) {
+      item = this.fromResult(result);
+    }
+    result.close();
+    return item;
   }
 
   async save(template: RecordTemplateModel): Promise<number> {
@@ -77,10 +142,12 @@ export class RecordTemplateRepository {
 
   private async findSimilar(template: RecordTemplateModel): Promise<RecordTemplateModel | null> {
     const result = await this.store().querySql(
-      `SELECT t.*, c.name AS category_name, c.color AS category_color, a.name AS account_name
+      `SELECT t.*, COALESCE(c.name, '分类已删除') AS category_name,
+        COALESCE(c.color, '#9AA4B2') AS category_color,
+        COALESCE(a.name, '账户已删除') AS account_name
       FROM t_record_template t
-      JOIN t_category c ON t.category_id = c.id
-      JOIN t_account a ON t.account_id = a.id
+      LEFT JOIN t_category c ON t.category_id = c.id
+      LEFT JOIN t_account a ON t.account_id = a.id
       WHERE t.type = ? AND t.category_id = ? AND t.account_id = ? AND t.amount = ? AND t.remark = ?
       LIMIT 1`,
       [template.type, template.categoryId, template.accountId, template.amount, template.remark]

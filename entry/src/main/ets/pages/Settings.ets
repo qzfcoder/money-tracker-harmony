@@ -17,6 +17,7 @@ struct Settings {
   @State autoReviewEnabled: boolean = true;
   @State autoDefaultAccountId: number = 0;
   @State alipayBillImportEnabled: boolean = false;
+  @State floatingBallEnabled: boolean = false;
   @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
 
   aboutToAppear(): void {
@@ -161,6 +162,9 @@ struct Settings {
       this.RouteRow('分类管理', '调整常用分类和排序', ROUTES.CATEGORY_MANAGE)
       this.RouteRow('账户管理', '新增、编辑账户余额', ROUTES.ACCOUNT_MANAGE)
       this.RouteRow('预算管理', '设置月度预算', ROUTES.BUDGET_SETTING)
+      this.RouteRow('工资管理', '设置收入节奏和发薪日', ROUTES.SALARY_MANAGE)
+      this.RouteRow('周期账单', '管理固定收入和固定支出', ROUTES.RECURRING_BILL)
+      this.RouteRow('账本报告', '查看月报、年报和消费结构', ROUTES.REPORTS)
       this.RouteRow('数据导出', '导出 CSV 账单文件', ROUTES.DATA_EXPORT)
       this.RouteRow('关于', '版本和说明', ROUTES.ABOUT)
     }
@@ -272,6 +276,7 @@ struct Settings {
       this.autoReviewEnabled = settings.autoReviewEnabled;
       this.autoDefaultAccountId = settings.autoDefaultAccountId;
       this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
+      this.floatingBallEnabled = settings.floatingBallEnabled;
     } catch (error) {
       ToastUtil.show(ToastUtil.error(error, '设置加载失败'));
     }
@@ -281,10 +286,11 @@ struct Settings {
     const settings: AppSettingsData = {
       themeMode: this.themeMode,
       currencySymbol: this.currencySymbol.trim() || '¥',
-      autoBookkeepingEnabled: false,
-      autoReviewEnabled: true,
-      autoDefaultAccountId: 0,
-      alipayBillImportEnabled: false
+      autoBookkeepingEnabled: this.autoBookkeepingEnabled,
+      autoReviewEnabled: this.autoReviewEnabled,
+      autoDefaultAccountId: this.autoDefaultAccountId,
+      alipayBillImportEnabled: this.alipayBillImportEnabled,
+      floatingBallEnabled: this.floatingBallEnabled
     };
     try {
       await this.repository.saveUserName(getContext(this), this.userName);

@@ -61,14 +61,18 @@ export interface RecordSearchOptions {
   keyword?: string;
   type?: RecordType.EXPENSE | RecordType.INCOME | RecordType.TRANSFER | 0;
   categoryId?: number;
+  accountId?: number;
   startTime?: number;
   endTime?: number;
+  ledgerName?: string;
   limit?: number;
   offset?: number;
 }
 
 export class RecordRepository {
   private accountRepository: AccountRepository = new AccountRepository();
+
+  private static readonly MILLIS_THRESHOLD: number = 1000000000000;
 
   private store(): relationalStore.RdbStore {
     return AppDatabase.getInstance().getStore();
@@ -84,6 +88,7 @@ export class RecordRepository {
       accountId: record.accountId,
       transferAccountId: record.transferAccountId,
       recordTime: record.recordTime,
+      ledgerName: record.ledgerName.trim() || '日常账本',
       remark: record.remark,
       createTime: record.createTime > 0 ? record.createTime : now,
       updateTime: now
@@ -110,6 +115,7 @@ export class RecordRepository {
       accountId: record.accountId,
       transferAccountId: record.transferAccountId,
       recordTime: record.recordTime,
+      ledgerName: record.ledgerName.trim() || previous.ledgerName || '日常账本',
       remark: record.remark,
       createTime: previous.createTime,
       updateTime: Date.now()
@@ -134,12 +140,46 @@ export class RecordRepository {
     await this.rollbackAccountChange(record);
   }
 
+  async deleteMany(ids: number[]): Promise<number> {
+    let deleted = 0;
+    for (const id of ids) {
+      if (id > 0) {
+        await this.deleteById(id);
+        deleted++;
+      }
+    }
+    return deleted;
+  }
+
   async listRecent(limit: number = 20, offset: number = 0): Promise<RecordListItem[]> {
     return this.queryRecords('1 = 1', [], limit, offset);
   }
 
+  async listRecentByLedger(ledgerName: string, limit: number = 20, offset: number = 0): Promise<RecordListItem[]> {
+    return this.queryRecords('r.ledger_name = ?', [ledgerName.trim() || '日常账本'], limit, offset);
+  }
+
   async listByRange(startTime: number, endTime: number, limit: number = 200, offset: number = 0): Promise<RecordListItem[]> {
-    return this.queryRecords('r.record_time >= ? AND r.record_time < ?', [startTime, endTime], limit, offset);
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    return this.queryRecords(
+      '(r.record_time >= ? AND r.record_time < ?) OR (r.record_time >= ? AND r.record_time < ?)',
+      [startTime, endTime, startSecond, endSecond],
+      limit,
+      offset
+    );
+  }
+
+  async listByRangeAndLedger(startTime: number, endTime: number, ledgerName: string,
+    limit: number = 200, offset: number = 0): Promise<RecordListItem[]> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    return this.queryRecords(
+      'r.ledger_name = ? AND ((r.record_time >= ? AND r.record_time < ?) OR (r.record_time >= ? AND r.record_time < ?))',
+      [ledgerName.trim() || '日常账本', startTime, endTime, startSecond, endSecond],
+      limit,
+      offset
+    );
   }
 
   async searchRecords(options: RecordSearchOptions): Promise<RecordListItem[]> {
@@ -159,24 +199,54 @@ export class RecordRepository {
       clauses.push('r.category_id = ?');
       params.push(options.categoryId);
     }
+    if (options.accountId && options.accountId > 0) {
+      clauses.push('(r.account_id = ? OR r.transfer_account_id = ?)');
+      params.push(options.accountId, options.accountId);
+    }
+    const ledgerName = (options.ledgerName || '').trim();
+    if (ledgerName.length > 0) {
+      clauses.push('r.ledger_name = ?');
+      params.push(ledgerName);
+    }
+    const normalizedRecordTime = "CASE WHEN r.record_time < 1000000000000 THEN r.record_time * 1000 ELSE r.record_time END";
     if (typeof options.startTime === 'number') {
-      clauses.push('r.record_time >= ?');
-      params.push(options.startTime);
+      if (typeof options.endTime === 'number') {
+        clauses.push(`(${normalizedRecordTime} >= ? AND ${normalizedRecordTime} < ?)`);
+        params.push(options.startTime, options.endTime);
+      } else {
+        clauses.push(`${normalizedRecordTime} >= ?`);
+        params.push(options.startTime);
+      }
     }
     if (typeof options.endTime === 'number') {
-      clauses.push('r.record_time < ?');
-      params.push(options.endTime);
+      if (typeof options.startTime !== 'number') {
+        clauses.push(`${normalizedRecordTime} < ?`);
+        params.push(options.endTime);
+      }
     }
     return this.queryRecords(clauses.length > 0 ? clauses.join(' AND ') : '1 = 1', params, options.limit || 200, options.offset || 0);
   }
 
-  async monthSummary(startTime: number, endTime: number): Promise<MonthSummary> {
+  async monthSummary(startTime: number, endTime: number, ledgerName: string = ''): Promise<MonthSummary> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const normalizedLedger = ledgerName.trim();
+    const ledgerClause = normalizedLedger.length > 0 ? ' AND ledger_name = ?' : '';
+    const params: (number | string)[] = [
+      RecordType.EXPENSE, RecordType.INCOME, startTime, endTime, startSecond, endSecond
+    ];
+    if (normalizedLedger.length > 0) {
+      params.push(normalizedLedger);
+    }
     const result = await this.store().querySql(
       `SELECT type, SUM(amount) AS total_amount
       FROM t_record
-      WHERE record_time >= ? AND record_time < ? AND type IN (?, ?)
+      WHERE type IN (?, ?) AND (
+        (record_time >= ? AND record_time < ?)
+        OR (record_time >= ? AND record_time < ?)
+      )${ledgerClause}
       GROUP BY type`,
-      [startTime, endTime, RecordType.EXPENSE, RecordType.INCOME]
+      params
     );
     let income = 0;
     let expense = 0;
@@ -194,12 +264,25 @@ export class RecordRepository {
     return new MonthSummary(income, expense, income - expense);
   }
 
-  async recordCount(startTime: number, endTime: number): Promise<number> {
+  async recordCount(startTime: number, endTime: number, ledgerName: string = ''): Promise<number> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const normalizedLedger = ledgerName.trim();
+    const ledgerClause = normalizedLedger.length > 0 ? ' AND ledger_name = ?' : '';
+    const params: (number | string)[] = [
+      RecordType.EXPENSE, RecordType.INCOME, startTime, endTime, startSecond, endSecond
+    ];
+    if (normalizedLedger.length > 0) {
+      params.push(normalizedLedger);
+    }
     const result = await this.store().querySql(
       `SELECT COUNT(1) AS record_count
       FROM t_record
-      WHERE record_time >= ? AND record_time < ? AND type IN (?, ?)`,
-      [startTime, endTime, RecordType.EXPENSE, RecordType.INCOME]
+      WHERE type IN (?, ?) AND (
+        (record_time >= ? AND record_time < ?)
+        OR (record_time >= ? AND record_time < ?)
+      )${ledgerClause}`,
+      params
     );
     let count = 0;
     if (result.goToFirstRow()) {
@@ -209,16 +292,24 @@ export class RecordRepository {
     return count;
   }
 
-  async categoryExpenseRanks(startTime: number, endTime: number): Promise<CategoryExpenseRank[]> {
+  async categoryExpenseRanks(startTime: number, endTime: number, ledgerName: string = ''): Promise<CategoryExpenseRank[]> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const normalizedLedger = ledgerName.trim();
+    const ledgerClause = normalizedLedger.length > 0 ? ' AND r.ledger_name = ?' : '';
+    const params: (number | string)[] = [RecordType.EXPENSE, startTime, endTime, startSecond, endSecond];
+    if (normalizedLedger.length > 0) {
+      params.push(normalizedLedger);
+    }
     const result = await this.store().querySql(
       `SELECT c.id AS category_id, c.name AS category_name, c.color AS category_color,
         SUM(r.amount) AS total_amount, COUNT(1) AS record_count
       FROM t_record r
       JOIN t_category c ON r.category_id = c.id
-      WHERE r.type = ? AND r.record_time >= ? AND r.record_time < ?
+      WHERE r.type = ? AND ((r.record_time >= ? AND r.record_time < ?) OR (r.record_time >= ? AND r.record_time < ?))${ledgerClause}
       GROUP BY c.id, c.name, c.color
       ORDER BY total_amount DESC`,
-      [RecordType.EXPENSE, startTime, endTime]
+      params
     );
     const list: CategoryExpenseRank[] = [];
     let total = 0;
@@ -325,24 +416,32 @@ export class RecordRepository {
     return map;
   }
 
-  async trendByDay(startTime: number, endTime: number): Promise<TrendPoint[]> {
-    return this.trendByFormat(startTime, endTime, '%Y-%m-%d');
+  async trendByDay(startTime: number, endTime: number, ledgerName: string = ''): Promise<TrendPoint[]> {
+    return this.trendByFormat(startTime, endTime, '%Y-%m-%d', ledgerName);
   }
 
-  async trendByMonth(startTime: number, endTime: number): Promise<TrendPoint[]> {
-    return this.trendByFormat(startTime, endTime, '%Y-%m');
+  async trendByMonth(startTime: number, endTime: number, ledgerName: string = ''): Promise<TrendPoint[]> {
+    return this.trendByFormat(startTime, endTime, '%Y-%m', ledgerName);
   }
 
   async dailyCashflow(startTime: number, endTime: number): Promise<DailyCashflow[]> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
     const result = await this.store().querySql(
-      `SELECT strftime('%Y-%m-%d', record_time / 1000, 'unixepoch', 'localtime') AS day_key,
+      `SELECT strftime('%Y-%m-%d', CASE
+          WHEN record_time >= ? THEN record_time / 1000
+          ELSE record_time
+        END, 'unixepoch', 'localtime') AS day_key,
         SUM(CASE WHEN type = ? THEN amount ELSE 0 END) AS income_amount,
         SUM(CASE WHEN type = ? THEN amount ELSE 0 END) AS expense_amount
       FROM t_record
-      WHERE record_time >= ? AND record_time < ? AND type IN (?, ?)
+      WHERE type IN (?, ?) AND (
+        (record_time >= ? AND record_time < ?)
+        OR (record_time >= ? AND record_time < ?)
+      )
       GROUP BY day_key
       ORDER BY day_key ASC`,
-      [RecordType.INCOME, RecordType.EXPENSE, startTime, endTime, RecordType.INCOME, RecordType.EXPENSE]
+      [RecordRepository.MILLIS_THRESHOLD, RecordType.INCOME, RecordType.EXPENSE, RecordType.INCOME, RecordType.EXPENSE, startTime, endTime, startSecond, endSecond]
     );
     const list: DailyCashflow[] = [];
     while (result.goToNextRow()) {
@@ -368,11 +467,16 @@ export class RecordRepository {
 
   private async queryRecords(whereClause: string, params: (number | string)[], limit: number, offset: number): Promise<RecordListItem[]> {
     const result = await this.store().querySql(
-      `SELECT r.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
-        a.name AS account_name
+      `SELECT r.*, COALESCE(c.name, '转账') AS category_name,
+        COALESCE(c.icon, '转') AS category_icon,
+        COALESCE(c.color, '#2F7EF7') AS category_color,
+        COALESCE(a.name, '账户已删除') AS account_name,
+        CASE WHEN r.transfer_account_id IS NULL THEN NULL
+          ELSE COALESCE(ta.name, '账户已删除') END AS transfer_account_name
       FROM t_record r
-      JOIN t_category c ON r.category_id = c.id
-      JOIN t_account a ON r.account_id = a.id
+      LEFT JOIN t_category c ON r.category_id = c.id
+      LEFT JOIN t_account a ON r.account_id = a.id
+      LEFT JOIN t_account ta ON r.transfer_account_id = ta.id
       WHERE ${whereClause}
       ORDER BY r.record_time DESC, r.id DESC
       LIMIT ? OFFSET ?`,
@@ -416,16 +520,34 @@ export class RecordRepository {
     }
   }
 
-  private async trendByFormat(startTime: number, endTime: number, format: string): Promise<TrendPoint[]> {
+  private async trendByFormat(startTime: number, endTime: number, format: string,
+    ledgerName: string = ''): Promise<TrendPoint[]> {
+    const startSecond = Math.floor(startTime / 1000);
+    const endSecond = Math.floor(endTime / 1000);
+    const normalizedLedger = ledgerName.trim();
+    const ledgerClause = normalizedLedger.length > 0 ? ' AND ledger_name = ?' : '';
+    const params: (number | string)[] = [
+      format, RecordRepository.MILLIS_THRESHOLD, RecordType.INCOME, RecordType.EXPENSE,
+      RecordType.INCOME, RecordType.EXPENSE, startTime, endTime, startSecond, endSecond
+    ];
+    if (normalizedLedger.length > 0) {
+      params.push(normalizedLedger);
+    }
     const result = await this.store().querySql(
-      `SELECT strftime(?, record_time / 1000, 'unixepoch', 'localtime') AS bucket,
+      `SELECT strftime(?, CASE
+          WHEN record_time >= ? THEN record_time / 1000
+          ELSE record_time
+        END, 'unixepoch', 'localtime') AS bucket,
         SUM(CASE WHEN type = ? THEN amount ELSE 0 END) AS income_amount,
         SUM(CASE WHEN type = ? THEN amount ELSE 0 END) AS expense_amount
       FROM t_record
-      WHERE record_time >= ? AND record_time < ? AND type IN (?, ?)
+      WHERE type IN (?, ?) AND (
+        (record_time >= ? AND record_time < ?)
+        OR (record_time >= ? AND record_time < ?)
+      )${ledgerClause}
       GROUP BY bucket
       ORDER BY bucket ASC`,
-      [format, RecordType.INCOME, RecordType.EXPENSE, startTime, endTime, RecordType.INCOME, RecordType.EXPENSE]
+      params
     );
     const list: TrendPoint[] = [];
     while (result.goToNextRow()) {
@@ -449,6 +571,7 @@ export class RecordRepository {
       bucket['transfer_account_id'] = record.transferAccountId;
     }
     bucket['record_time'] = record.recordTime;
+    bucket['ledger_name'] = record.ledgerName.trim() || '日常账本';
     bucket['remark'] = record.remark;
     bucket['create_time'] = record.createTime;
     bucket['update_time'] = record.updateTime;
@@ -465,6 +588,7 @@ export class RecordRepository {
       accountId: result.getLong(result.getColumnIndex('account_id')),
       transferAccountId: result.isColumnNull(transferIndex) ? undefined : result.getLong(transferIndex),
       recordTime: result.getLong(result.getColumnIndex('record_time')),
+      ledgerName: result.getString(result.getColumnIndex('ledger_name')) || '日常账本',
       remark: result.getString(result.getColumnIndex('remark')),
       createTime: result.getLong(result.getColumnIndex('create_time')),
       updateTime: result.getLong(result.getColumnIndex('update_time'))
@@ -481,13 +605,17 @@ export class RecordRepository {
       accountId: record.accountId,
       transferAccountId: record.transferAccountId,
       recordTime: record.recordTime,
+      ledgerName: record.ledgerName,
       remark: record.remark,
       createTime: record.createTime,
       updateTime: record.updateTime,
       categoryName: result.getString(result.getColumnIndex('category_name')),
       categoryIcon: result.getString(result.getColumnIndex('category_icon')),
       categoryColor: result.getString(result.getColumnIndex('category_color')),
-      accountName: result.getString(result.getColumnIndex('account_name'))
+      accountName: result.getString(result.getColumnIndex('account_name')),
+      transferAccountName: result.isColumnNull(result.getColumnIndex('transfer_account_name'))
+        ? undefined
+        : result.getString(result.getColumnIndex('transfer_account_name'))
     };
     return item;
   }

@@ -10,6 +10,7 @@ import { AccountRepository } from '../repository/AccountRepository';
 import { CategoryRepository } from '../repository/CategoryRepository';
 import { AppSettingsData, SettingsRepository, ThemeMode } from '../repository/SettingsRepository';
 import { AutoBookkeepingService } from '../service/AutoBookkeepingService';
+import { FloatingBallBookkeepingService, FloatingBallClickResult, FloatingBallStateInfo } from '../service/FloatingBallBookkeepingService';
 import { OcrBookkeepingService } from '../service/OcrBookkeepingService';
 import { AppState } from '../viewmodel/AppState';
 import { DateUtil } from '../utils/DateUtil';
@@ -49,6 +50,7 @@ struct AutoBookkeeping {
   @State reviewEnabled: boolean = true;
   @State defaultAccountId: number = 0;
   @State alipayBillImportEnabled: boolean = false;
+  @State floatingBallEnabled: boolean = false;
 
   @State ruleType: AutoRuleType = AutoRuleType.CATEGORY;
   @State ruleKeyword: string = '';
@@ -60,6 +62,8 @@ struct AutoBookkeeping {
   @State ocrText: string = '';
   @State ocrSummary: string = '';
   @State ocrRecordTime: number = 0;
+  @State floatingBallRunning: boolean = false;
+  @State floatingBallMessage: string = '';
   @State launchPromptVisible: boolean = false;
   @State editingBillId: number = 0;
   @State editingAmountText: string = '';
@@ -76,6 +80,9 @@ struct AutoBookkeeping {
       return;
     }
     this.readLaunchParams();
+    FloatingBallBookkeepingService.setClickHandler((result: FloatingBallClickResult) => {
+      this.floatingBallMessage = result.message;
+    });
     this.loadAll().then(() => {
       this.handleLaunchAction();
     });
@@ -191,19 +198,19 @@ struct AutoBookkeeping {
       if (this.isWide()) {
         Row({ space: 10 }) {
           this.StatChip('待确认', `${this.pendingBills.length} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
-          this.StatChip('规则', `${this.rules.length} 条`, AppColors.CHART_GREEN, '#E6F7EF')
-          this.StatChip('来源', this.sourceSummary(), AppColors.WARNING, '#FFF4DE')
+          this.StatChip('规则', `${this.rules.length} 条`, AppColors.CHART_GREEN, AppColors.softGreen())
+          this.StatChip('来源', this.sourceSummary(), AppColors.WARNING, AppColors.softYellow())
         }
         .width('100%')
       } else {
         Column({ space: 10 }) {
           Row({ space: 10 }) {
             this.StatChip('待确认', `${this.pendingBills.length} 条`, AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
-            this.StatChip('规则', `${this.rules.length} 条`, AppColors.CHART_GREEN, '#E6F7EF')
+            this.StatChip('规则', `${this.rules.length} 条`, AppColors.CHART_GREEN, AppColors.softGreen())
           }
           Row({ space: 10 }) {
-            this.StatChip('来源', this.sourceSummary(), AppColors.WARNING, '#FFF4DE')
-            this.StatChip('校验', this.reviewEnabled ? '先确认' : '手动入队', AppColors.CHART_PINK, '#FFEAF0')
+            this.StatChip('来源', this.sourceSummary(), AppColors.WARNING, AppColors.softYellow())
+            this.StatChip('校验', this.reviewEnabled ? '先确认' : '手动入队', AppColors.CHART_PINK, AppColors.softPink())
           }
         }
         .width('100%')
@@ -328,7 +335,7 @@ struct AutoBookkeeping {
           .fontColor(AppColors.EXPENSE)
           .height(34)
           .padding({ left: 12, right: 12 })
-          .backgroundColor('#FCE9E4')
+          .backgroundColor(AppColors.softDanger())
           .borderRadius(AppRadius.PILL)
           .onClick(() => this.clearCache())
       }
@@ -421,7 +428,7 @@ struct AutoBookkeeping {
           .borderRadius(16)
         Row({ space: 10 }) {
           this.ActionButton('加入待确认', AppColors.SURFACE, AppColors.CHART_GREEN, () => this.captureOcrText())
-          this.ActionButton('清空结果', AppColors.EXPENSE, '#FCE9E4', () => {
+          this.ActionButton('清空结果', AppColors.EXPENSE, AppColors.softDanger(), () => {
             this.ocrText = '';
             this.ocrSummary = '';
           })
@@ -465,7 +472,7 @@ struct AutoBookkeeping {
             .width(42)
             .height(42)
             .textAlign(TextAlign.Center)
-            .backgroundColor(item.type === RecordType.INCOME ? '#E6F7EF' : '#FFEAF0')
+            .backgroundColor(item.type === RecordType.INCOME ? AppColors.softGreen() : AppColors.softPink())
             .borderRadius(16)
           Column({ space: 4 }) {
             Text(NumberUtil.money(item.amount))
@@ -501,7 +508,7 @@ struct AutoBookkeeping {
       Row({ space: 10 }) {
         this.ActionButton('确认入账', AppColors.SURFACE, AppColors.CHART_GREEN, () => this.confirm(item))
         this.ActionButton(this.editingBillId === item.id ? '收起修改' : '修改', AppColors.CHART_BLUE, AppColors.SURFACE_TINT, () => this.toggleEditBill(item))
-        this.ActionButton('忽略', AppColors.EXPENSE, '#FCE9E4', () => this.discard(item))
+        this.ActionButton('忽略', AppColors.EXPENSE, AppColors.softDanger(), () => this.discard(item))
       }
       .width('100%')
 
@@ -656,7 +663,14 @@ struct AutoBookkeeping {
       this.ToggleRow('自动记账校验开关', '开启后所有识别结果先进入待确认账单。', this.reviewEnabled, () => {
         this.toggleReviewEnabled();
       })
-      Text('发布版采用用户主动触发：手动选择账单截图后，本机 OCR 识别结果先进入待确认。')
+      if (FeatureFlags.FLOATING_BALL_VISIBLE) {
+        this.ToggleRow('闪控球入口', this.floatingBallMessage || '开启后离开应用也能点球回到识别页。', this.floatingBallRunning, () => {
+          this.toggleFloatingBall();
+        })
+      }
+      Text(FeatureFlags.FLOATING_BALL_VISIBLE
+        ? '采用用户主动触发：点闪控球或手动选择截图后，识别结果先进入待确认。'
+        : '发布版采用用户主动触发：手动选择账单截图后，本机 OCR 识别结果先进入待确认。')
         .fontSize(12)
         .fontColor(AppColors.MUTED)
         .lineHeight(20)
@@ -679,7 +693,7 @@ struct AutoBookkeeping {
         .lineHeight(22)
         .width('100%')
       Row({ space: 10 }) {
-        this.ActionButton('清空识别缓存', AppColors.EXPENSE, '#FCE9E4', () => this.clearCache())
+        this.ActionButton('清空识别缓存', AppColors.EXPENSE, AppColors.softDanger(), () => this.clearCache())
         this.ActionButton('刷新状态', AppColors.CHART_BLUE, AppColors.SURFACE_TINT, () => this.loadAll())
       }
       .width('100%')
@@ -811,7 +825,7 @@ struct AutoBookkeeping {
         .width(42)
         .height(42)
         .textAlign(TextAlign.Center)
-        .backgroundColor(item.ruleType === AutoRuleType.BLACKLIST ? '#FCE9E4' : '#E6F7EF')
+        .backgroundColor(item.ruleType === AutoRuleType.BLACKLIST ? AppColors.softDanger() : AppColors.softGreen())
         .borderRadius(16)
       Column({ space: 4 }) {
         Text(item.keyword)
@@ -832,7 +846,7 @@ struct AutoBookkeeping {
         .fontColor(AppColors.EXPENSE)
         .width(42)
         .height(36)
-        .backgroundColor('#FCE9E4')
+        .backgroundColor(AppColors.softDanger())
         .borderRadius(18)
         .onClick(() => this.deleteRule(item))
     }
@@ -955,6 +969,7 @@ struct AutoBookkeeping {
       const pendingBills = await service.listPending(50, 0);
       this.rules = rules.slice();
       this.pendingBills = pendingBills.slice();
+      await this.restoreFloatingBallState();
       this.pickFirstCategory();
       await AppState.getInstance().refreshPendingAutoBills();
     } catch (error) {
@@ -969,6 +984,7 @@ struct AutoBookkeeping {
     this.reviewEnabled = settings.autoReviewEnabled;
     this.defaultAccountId = settings.autoDefaultAccountId;
     this.alipayBillImportEnabled = settings.alipayBillImportEnabled;
+    this.floatingBallEnabled = settings.floatingBallEnabled;
   }
 
   private async refreshRecognitionState(): Promise<void> {
@@ -979,7 +995,30 @@ struct AutoBookkeeping {
     const pendingBills = await service.listPending(50, 0);
     this.rules = rules.slice();
     this.pendingBills = pendingBills.slice();
+    await this.restoreFloatingBallState();
     await AppState.getInstance().refreshPendingAutoBills();
+  }
+
+  private async restoreFloatingBallState(): Promise<void> {
+    if (!FeatureFlags.FLOATING_BALL_VISIBLE) {
+      this.floatingBallRunning = false;
+      this.floatingBallMessage = '当前发布配置未开启闪控球';
+      return;
+    }
+    this.floatingBallRunning = FloatingBallBookkeepingService.isRunning();
+    if (this.floatingBallEnabled && !this.floatingBallRunning) {
+      const state = await FloatingBallBookkeepingService.start(getContext(this));
+      this.floatingBallRunning = state.running;
+      this.floatingBallEnabled = state.running;
+      this.floatingBallMessage = state.message;
+      if (!state.running) {
+        await this.saveSettings(false);
+      }
+      return;
+    }
+    this.floatingBallMessage = FloatingBallBookkeepingService.isSupported()
+      ? (this.floatingBallRunning ? '闪控球运行中' : '可开启闪控球入口')
+      : '当前配置或设备暂不支持闪控球';
   }
 
   private async saveSettings(showToast: boolean = true): Promise<void> {
@@ -989,7 +1028,8 @@ struct AutoBookkeeping {
       autoBookkeepingEnabled: this.autoEnabled,
       autoReviewEnabled: this.reviewEnabled,
       autoDefaultAccountId: this.defaultAccountId,
-      alipayBillImportEnabled: this.alipayBillImportEnabled
+      alipayBillImportEnabled: this.alipayBillImportEnabled,
+      floatingBallEnabled: this.floatingBallEnabled
     };
     await this.settingsRepository.save(getContext(this), settings);
     if (showToast) {
@@ -1020,6 +1060,31 @@ struct AutoBookkeeping {
     } catch (error) {
       this.reviewEnabled = previous;
       ToastUtil.show(ToastUtil.error(error, '设置保存失败'));
+    }
+  }
+
+  private async toggleFloatingBall(): Promise<void> {
+    try {
+      let state: FloatingBallStateInfo;
+      if (this.floatingBallRunning) {
+        state = await FloatingBallBookkeepingService.stop();
+        this.floatingBallEnabled = false;
+      } else {
+        if (!this.autoEnabled) {
+          this.autoEnabled = true;
+        }
+        this.floatingBallEnabled = true;
+        state = await FloatingBallBookkeepingService.start(getContext(this));
+      }
+      this.floatingBallRunning = state.running;
+      this.floatingBallEnabled = state.running;
+      this.floatingBallMessage = state.message;
+      await this.saveSettings(false);
+      ToastUtil.show(state.message);
+    } catch (error) {
+      this.floatingBallRunning = FloatingBallBookkeepingService.isRunning();
+      this.floatingBallMessage = ToastUtil.error(error, '闪控球操作失败');
+      ToastUtil.show(this.floatingBallMessage);
     }
   }
 
@@ -1251,7 +1316,7 @@ struct AutoBookkeeping {
     const params = router.getParams() as AutoBookkeepingParams;
     const action = `${params?.launchAction || ''}`;
     const recordTime = Number(params?.recordTime || 0);
-    if (action !== 'screenOcr' && action !== 'galleryOcr') {
+    if (action !== 'screenOcr' && action !== 'galleryOcr' && action !== 'floatingBallOcr') {
       return;
     }
     this.pendingLaunchAction = 'galleryOcr';
@@ -1270,7 +1335,7 @@ struct AutoBookkeeping {
     }
     this.launchActionHandled = true;
     this.activeTab = AutoPageTab.OCR;
-    ToastUtil.show('已进入日历识别，可点击开始识别账单');
+    ToastUtil.show('已进入识别页，可点击开始识别账单');
     setTimeout(() => {
       this.startPendingLaunchAction();
     }, 600);

@@ -10,6 +10,11 @@ export class ROUTES {
   static readonly CATEGORY_MANAGE: string = 'pages/CategoryManage';
   static readonly ACCOUNT_MANAGE: string = 'pages/AccountManage';
   static readonly BUDGET_SETTING: string = 'pages/BudgetSetting';
+  static readonly SALARY_MANAGE: string = 'pages/SalaryManage';
+  static readonly RECURRING_BILL: string = 'pages/RecurringBill';
+  static readonly REPORTS: string = 'pages/Reports';
+  static readonly LEDGER_ENHANCE: string = 'pages/LedgerEnhance';
+  static readonly ACCOUNT_LEDGER: string = 'pages/AccountLedger';
   static readonly SEARCH: string = 'pages/Search';
   static readonly CALENDAR: string = 'pages/Calendar';
   static readonly DATA_EXPORT: string = 'pages/DataExport';

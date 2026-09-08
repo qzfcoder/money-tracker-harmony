@@ -7,11 +7,28 @@ import { NumberUtil } from '../utils/NumberUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { AppDatabase } from '../database/AppDatabase';
 
+interface AccountIconPreset {
+  key: string;
+  label: string;
+}
+
 @Entry
 @Component
 struct AccountManage {
   private repository: AccountRepository = new AccountRepository();
+  private iconPresets: AccountIconPreset[] = [
+    { key: 'wallet', label: '钱' }, { key: 'cash', label: '现' }, { key: 'card', label: '卡' },
+    { key: 'credit', label: '信' }, { key: 'alipay', label: '支' }, { key: 'wechat', label: '微' },
+    { key: 'bank', label: '银' }, { key: 'debt', label: '债' }, { key: 'loan', label: '贷' },
+    { key: 'fund', label: '基' }, { key: 'saving', label: '存' }, { key: 'family', label: '家' },
+    { key: 'other', label: '其' }
+  ];
+  private colorPresets: string[] = [
+    '#2F7EF7', '#21BA78', '#FFB33D', '#FF6F8D', '#826CFF', '#19BFAF',
+    '#F46F80', '#657A55', '#36A2EB', '#F59E0B', '#10B981', '#EF4444'
+  ];
 
+  @State viewportWidth: number = 0;
   @State accounts: AccountModel[] = [];
   @State selectedId: number = 0;
   @State nameText: string = '';
@@ -22,6 +39,8 @@ struct AccountManage {
   @State colorText: string = '#2F7EF7';
   @State sortText: string = '1';
   @State isLiability: boolean = false;
+  @State iconPickerVisible: boolean = false;
+  @State colorPickerVisible: boolean = false;
 
   aboutToAppear(): void {
     this.loadAccounts();
@@ -47,6 +66,9 @@ struct AccountManage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.CANVAS)
+    .onAreaChange((oldValue, newValue) => {
+      this.viewportWidth = parseFloat(`${newValue.width}`);
+    })
   }
 
   @Builder
@@ -142,27 +164,8 @@ struct AccountManage {
       }
       .width('100%')
 
-      Row({ space: 10 }) {
-        TextInput({ text: this.iconText, placeholder: '图标标识' })
-          .height(50)
-          .layoutWeight(1)
-          .backgroundColor(AppColors.SURFACE_SOFT)
-          .borderRadius(16)
-          .padding({ left: 16, right: 16 })
-          .onChange((value: string) => {
-            this.iconText = value;
-          })
-        TextInput({ text: this.colorText, placeholder: '#2F7EF7' })
-          .height(50)
-          .layoutWeight(1)
-          .backgroundColor(AppColors.SURFACE_SOFT)
-          .borderRadius(16)
-          .padding({ left: 16, right: 16 })
-          .onChange((value: string) => {
-            this.colorText = value;
-          })
-      }
-      .width('100%')
+      this.IconPicker()
+      this.ColorPicker()
 
       Row({ space: 10 }) {
         TextInput({ text: this.sortText, placeholder: '排序' })
@@ -181,7 +184,7 @@ struct AccountManage {
           .fontColor(this.isLiability ? AppColors.EXPENSE : AppColors.INCOME)
           .height(50)
           .layoutWeight(1)
-          .backgroundColor(this.isLiability ? '#FCE9E4' : '#E6F7EF')
+          .backgroundColor(this.isLiability ? AppColors.softDanger() : AppColors.softGreen())
           .borderRadius(16)
           .onClick(() => {
             this.isLiability = !this.isLiability;
@@ -216,6 +219,125 @@ struct AccountManage {
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private IconPicker() {
+    Column({ space: 8 }) {
+      Row() {
+        Column({ space: 4 }) {
+          Text('图标')
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+            .width('100%')
+          Text(this.currentIconLabel())
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.INK)
+            .width('100%')
+            .maxLines(1)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(this.iconPickerVisible ? '收起' : '更换')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+      .backgroundColor(AppColors.SURFACE_SOFT)
+      .borderRadius(16)
+      .onClick(() => {
+        this.iconPickerVisible = !this.iconPickerVisible;
+      })
+
+      if (this.iconPickerVisible) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.iconPresets, (item: AccountIconPreset) => {
+            Text(item.label)
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.iconText === item.key ? AppColors.SURFACE : this.colorText)
+              .width(42)
+              .height(42)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(this.iconText === item.key ? this.colorText : AppColors.SURFACE_SOFT)
+              .border({ width: 1, color: this.iconText === item.key ? this.colorText : AppColors.LINE })
+              .borderRadius(14)
+              .margin({ right: 8, bottom: 8 })
+              .onClick(() => {
+                this.iconText = item.key;
+                this.iconPickerVisible = false;
+              })
+          }, (item: AccountIconPreset) => item.key)
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private ColorPicker() {
+    Column({ space: 8 }) {
+      Row() {
+        Column({ space: 4 }) {
+          Text('颜色')
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+            .width('100%')
+          Text(this.colorText)
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.colorText)
+            .width('100%')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(this.colorPickerVisible ? '收起' : '更换')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+      .backgroundColor(AppColors.SURFACE_SOFT)
+      .borderRadius(16)
+      .onClick(() => {
+        this.colorPickerVisible = !this.colorPickerVisible;
+      })
+
+      if (this.colorPickerVisible) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.colorPresets, (color: string) => {
+            Text(this.colorText === color ? '✓' : '')
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.SURFACE)
+              .width(42)
+              .height(32)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(color)
+              .border({ width: this.colorText === color ? 2 : 0, color: AppColors.INK })
+              .borderRadius(12)
+              .margin({ right: 8, bottom: 8 })
+              .onClick(() => {
+                this.colorText = color;
+                this.colorPickerVisible = false;
+              })
+          }, (color: string) => color)
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
   }
 
   @Builder
@@ -255,71 +377,110 @@ struct AccountManage {
       }
       .width('100%')
 
-      ForEach(this.accounts, (item: AccountModel) => {
-        this.AccountRow(item)
-      }, (item: AccountModel) => `${item.id}`)
+      Text('长按账户卡片可拖动排序，也可使用右下角按钮微调')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(18)
+        .width('100%')
+
+      List({ space: 12 }) {
+        ForEach(this.accounts, (item: AccountModel) => {
+          ListItem() {
+            this.AccountRow(item)
+          }
+        }, (item: AccountModel) => `${item.id}`)
+          .onMove((from: number, to: number) => {
+            this.moveAccountByIndex(from, to);
+          })
+      }
+      .width('100%')
+      .height(this.accountListHeight())
+      .scrollBar(BarState.Off)
     }
     .width('100%')
   }
 
   @Builder
   private AccountRow(item: AccountModel) {
-    Row({ space: 12 }) {
-      Text(item.name.substring(0, 1))
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(item.color)
-        .width(44)
-        .height(44)
-        .textAlign(TextAlign.Center)
-        .backgroundColor(AppColors.SURFACE_TINT)
-        .borderRadius(14)
-
-      Column({ space: 4 }) {
-        Text(item.name)
-          .fontSize(16)
+    Column({ space: 10 }) {
+      Row({ space: 12 }) {
+        Text(this.iconLabel(item.icon, item.name))
+          .fontSize(15)
           .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.INK)
-          .maxLines(1)
-        Text(`${this.typeLabel(item.type)} · 排序 ${item.sortOrder}`)
-          .fontSize(12)
-          .fontColor(AppColors.MUTED)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
+          .fontColor(item.color)
+          .width(44)
+          .height(44)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(14)
 
-      Column({ space: 5 }) {
+        Column({ space: 4 }) {
+          Text(item.name)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.INK)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(`${this.typeLabel(item.type)} · 排序 ${item.sortOrder}`)
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+            .maxLines(1)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
         Text(NumberUtil.compactMoney(item.balance))
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor(item.isLiability ? AppColors.EXPENSE : AppColors.INK)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ maxWidth: 118 })
-        Row({ space: 6 }) {
-          Button('✎')
-            .fontSize(13)
-            .fontColor(AppColors.CHART_BLUE)
-            .width(34)
-            .height(32)
-            .backgroundColor(AppColors.SURFACE_TINT)
-            .borderRadius(16)
-            .onClick(() => this.pickForEdit(item))
-          Button('×')
-            .fontSize(13)
-            .fontColor(AppColors.EXPENSE)
-            .width(34)
-            .height(32)
-            .backgroundColor('#FCE9E4')
-            .borderRadius(16)
-            .onClick(() => this.remove(item))
-        }
       }
-      .alignItems(HorizontalAlign.End)
+      .width('100%')
+
+      Row({ space: 6 }) {
+        Button('↑')
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .width(32)
+          .height(32)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(16)
+          .onClick(() => this.moveAccount(item, -1))
+        Button('↓')
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .width(32)
+          .height(32)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(16)
+          .onClick(() => this.moveAccount(item, 1))
+        Button('编辑')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .width(54)
+          .height(32)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(16)
+          .onClick(() => this.pickForEdit(item))
+        Button('删除')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.EXPENSE)
+          .width(54)
+          .height(32)
+          .backgroundColor(AppColors.softDanger())
+          .borderRadius(16)
+          .onClick(() => this.remove(item))
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.End)
     }
     .width('100%')
-    .height(72)
-    .padding({ left: 16, right: 16 })
+    .padding({ left: 16, right: 16, top: 14, bottom: 14 })
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 16, color: AppColors.SHADOW, offsetY: 6 })
@@ -386,6 +547,64 @@ struct AccountManage {
     }
   }
 
+  private async moveAccount(item: AccountModel, direction: number): Promise<void> {
+    if (!item.id) {
+      return;
+    }
+    const index = this.accounts.findIndex((account: AccountModel) => account.id === item.id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= this.accounts.length) {
+      return;
+    }
+    const target = this.accounts[nextIndex];
+    if (!target.id) {
+      return;
+    }
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      await this.repository.updateSortOrder(item.id, target.sortOrder);
+      await this.repository.updateSortOrder(target.id, item.sortOrder);
+      await AppState.getInstance().refreshAll();
+      await this.loadAccounts();
+      ToastUtil.show('排序已更新');
+    } catch (error) {
+      ToastUtil.show('排序失败，请重试');
+    }
+  }
+
+  private moveAccountByIndex(from: number, to: number): void {
+    if (from < 0 || to < 0 || from >= this.accounts.length || to >= this.accounts.length || from === to) {
+      return;
+    }
+    const list = this.accounts.slice();
+    const moving = list.splice(from, 1);
+    if (moving.length === 0) {
+      return;
+    }
+    list.splice(to, 0, moving[0]);
+    this.accounts = list;
+    this.persistAccountOrder();
+  }
+
+  private async persistAccountOrder(): Promise<void> {
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      for (let index = 0; index < this.accounts.length; index++) {
+        const item = this.accounts[index];
+        if (item.id && item.id > 0) {
+          const sortOrder = index + 1;
+          item.sortOrder = sortOrder;
+          await this.repository.updateSortOrder(item.id, sortOrder);
+        }
+      }
+      await AppState.getInstance().refreshAll();
+      ToastUtil.show('排序已更新');
+    } catch (error) {
+      ToastUtil.show('排序失败，请重试');
+      await this.loadAccounts();
+    }
+  }
+
   private pickForEdit(item: AccountModel): void {
     this.selectedId = item.id || 0;
     this.nameText = item.name;
@@ -408,6 +627,8 @@ struct AccountManage {
     this.colorText = '#2F7EF7';
     this.isLiability = false;
     this.sortText = `${this.nextSortOrder()}`;
+    this.iconPickerVisible = false;
+    this.colorPickerVisible = false;
   }
 
   private normalizeAmount(value: string): string {
@@ -420,6 +641,10 @@ struct AccountManage {
     }
     const max = this.accounts.reduce((result: number, item: AccountModel) => Math.max(result, item.sortOrder), 0);
     return max + 1;
+  }
+
+  private accountListHeight(): number {
+    return Math.min(620, Math.max(112, this.accounts.length * 112));
   }
 
   private currentSelected(): AccountModel | undefined {
@@ -443,5 +668,21 @@ struct AccountManage {
       return '微信';
     }
     return '其他';
+  }
+
+  private iconLabel(icon: string, name: string): string {
+    const preset = this.iconPresets.find((item: AccountIconPreset) => item.key === icon);
+    if (preset) {
+      return preset.label;
+    }
+    return name.substring(0, 1);
+  }
+
+  private currentIconLabel(): string {
+    const preset = this.iconPresets.find((item: AccountIconPreset) => item.key === this.iconText);
+    if (preset) {
+      return `${preset.label} · ${preset.key}`;
+    }
+    return this.iconText || '未选择';
   }
 }

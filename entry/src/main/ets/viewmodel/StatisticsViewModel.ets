@@ -52,6 +52,7 @@ export class CategoryRankItem {
 @Observed
 export class StatisticsViewModel {
   private recordRepository: RecordRepository = new RecordRepository();
+  private ledgerName: string = '';
 
   periodOptions: PeriodOption[] = [
     new PeriodOption('周', StatisticsPeriod.WEEK),
@@ -69,19 +70,27 @@ export class StatisticsViewModel {
   income: number = 0;
   expense: number = 0;
   balance: number = 0;
+  rangeStartTime: number = 0;
+  rangeEndTime: number = 0;
   categoryRanks: CategoryRankItem[] = [];
   trendPoints: TrendPoint[] = [];
 
   async refresh(): Promise<void> {
     const range = this.getRange();
+    this.rangeStartTime = range.startTime;
+    this.rangeEndTime = range.endTime;
     this.rangeLabel = DateUtil.rangeLabel(range.startTime, range.endTime);
 
-    const summary: MonthSummary = await this.recordRepository.monthSummary(range.startTime, range.endTime);
+    const summary: MonthSummary = await this.recordRepository.monthSummary(
+      range.startTime, range.endTime, this.ledgerName
+    );
     this.income = summary.income;
     this.expense = summary.expense;
     this.balance = summary.balance;
 
-    const ranks = await this.recordRepository.categoryExpenseRanks(range.startTime, range.endTime);
+    const ranks = await this.recordRepository.categoryExpenseRanks(
+      range.startTime, range.endTime, this.ledgerName
+    );
     this.categoryRanks = ranks.map((item: CategoryExpenseRank) => {
       return new CategoryRankItem(
         item.categoryId,
@@ -94,9 +103,13 @@ export class StatisticsViewModel {
     });
 
     const rawTrend = range.useMonthBucket
-      ? await this.recordRepository.trendByMonth(range.startTime, range.endTime)
-      : await this.recordRepository.trendByDay(range.startTime, range.endTime);
+      ? await this.recordRepository.trendByMonth(range.startTime, range.endTime, this.ledgerName)
+      : await this.recordRepository.trendByDay(range.startTime, range.endTime, this.ledgerName);
     this.trendPoints = this.fillTrend(range, rawTrend);
+  }
+
+  setLedgerName(ledgerName: string): void {
+    this.ledgerName = ledgerName.trim();
   }
 
   async setPeriod(period: StatisticsPeriod): Promise<void> {

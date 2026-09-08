@@ -3,6 +3,9 @@ import { RecordListItem, RecordModel, RecordType } from '../model/Record';
 import { RecordRepository } from '../repository/RecordRepository';
 import { CategoryRepository } from '../repository/CategoryRepository';
 import { AccountRepository } from '../repository/AccountRepository';
+import { SalaryInsight, SalarySettingsData } from '../model/Salary';
+import { SalaryRepository } from '../repository/SalaryRepository';
+import { SalaryInsightService } from '../service/SalaryInsightService';
 import { AppState } from '../viewmodel/AppState';
 import { AppColors, AppRadius, AppSpace, LayoutSizes } from '../constants/DesignSystem';
 import { DateUtil } from '../utils/DateUtil';
@@ -10,6 +13,7 @@ import { NumberUtil } from '../utils/NumberUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { ROUTES } from '../constants/RouteConstants';
 import { AppDatabase } from '../database/AppDatabase';
+import { SpendingCardService } from '../widget/SpendingCardService';
 
 interface DetailParams {
   recordId?: number;
@@ -21,11 +25,15 @@ struct RecordDetail {
   private recordRepository: RecordRepository = new RecordRepository();
   private categoryRepository: CategoryRepository = new CategoryRepository();
   private accountRepository: AccountRepository = new AccountRepository();
+  private salaryRepository: SalaryRepository = new SalaryRepository();
 
   @State record: RecordModel | null = null;
   @State categoryName: string = '';
   @State accountName: string = '';
+  @State transferAccountName: string = '';
   @State appState: AppState = AppState.getInstance();
+  @State salarySettings: SalarySettingsData = new SalaryRepository().defaultSettings();
+  @State salaryInsight: SalaryInsight = new SalaryInsight();
   private recordId: number = 0;
 
   aboutToAppear(): void {
@@ -45,6 +53,7 @@ struct RecordDetail {
         Column({ space: 16 }) {
           if (this.record) {
             this.AmountCard()
+            this.WorkTimeCard()
             this.InfoCard()
             this.ActionCard()
           } else {
@@ -101,11 +110,13 @@ struct RecordDetail {
       Text(this.typeLabel())
         .fontSize(13)
         .fontWeight(FontWeight.Bold)
-        .fontColor(this.recordType() === RecordType.EXPENSE ? AppColors.EXPENSE : AppColors.INCOME)
+        .fontColor(this.recordType() === RecordType.EXPENSE ? AppColors.EXPENSE :
+          this.recordType() === RecordType.TRANSFER ? AppColors.CHART_BLUE : AppColors.INCOME)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor(this.recordType() === RecordType.EXPENSE ? '#FCE9E4' : '#E6F7EF')
+        .backgroundColor(this.recordType() === RecordType.EXPENSE ? AppColors.softDanger() :
+          this.recordType() === RecordType.TRANSFER ? AppColors.SURFACE_TINT : AppColors.softGreen())
         .borderRadius(AppRadius.PILL)
-      Text(`${this.recordType() === RecordType.EXPENSE ? '-' : '+'}${NumberUtil.money(this.recordAmount())}`)
+      Text(`${this.recordType() === RecordType.EXPENSE ? '-' : this.recordType() === RecordType.INCOME ? '+' : ''}${NumberUtil.money(this.recordAmount())}`)
         .fontSize(42)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.INK)
@@ -126,8 +137,13 @@ struct RecordDetail {
   @Builder
   private InfoCard() {
     Column({ space: 12 }) {
-      this.InfoRow('分类', this.displayCategoryName())
-      this.InfoRow('账户', this.displayAccountName())
+      if (this.recordType() === RecordType.TRANSFER) {
+        this.InfoRow('转出账户', this.displayAccountName())
+        this.InfoRow('转入账户', this.displayTransferAccountName())
+      } else {
+        this.InfoRow('分类', this.displayCategoryName())
+        this.InfoRow('账户', this.displayAccountName())
+      }
       this.InfoRow('备注', this.recordRemark() || '无')
       this.InfoRow('创建时间', DateUtil.dayLabel(this.createTime()) + ' ' + DateUtil.timeLabel(this.createTime()))
     }
@@ -136,6 +152,50 @@ struct RecordDetail {
     .backgroundColor(AppColors.SURFACE)
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private WorkTimeCard() {
+    if (this.recordType() === RecordType.EXPENSE && this.salarySettings.enabled && this.salaryInsight.hourlyIncome > 0) {
+      Row({ space: 12 }) {
+        Text('时')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_PURPLE)
+          .width(42)
+          .height(42)
+          .textAlign(TextAlign.Center)
+          .borderRadius(15)
+          .backgroundColor(AppColors.softPurple())
+        Column({ space: 4 }) {
+          Text('工作时间折算')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.INK)
+            .width('100%')
+          Text(`这笔支出约等于 ${SalaryInsightService.workTimeText(this.recordAmount(), this.salaryInsight.hourlyIncome)} 工作收入`)
+            .fontSize(13)
+            .fontColor(AppColors.MUTED)
+            .width('100%')
+            .maxLines(2)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text('调整')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_PURPLE)
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor(AppColors.softPurple())
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => router.pushUrl({ url: ROUTES.SALARY_MANAGE }))
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(AppColors.SURFACE)
+      .borderRadius(AppRadius.CARD)
+      .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
+    }
   }
 
   @Builder
@@ -174,7 +234,7 @@ struct RecordDetail {
           .fontColor(AppColors.EXPENSE)
           .height(50)
           .layoutWeight(1)
-          .backgroundColor('#FCE9E4')
+          .backgroundColor(AppColors.softDanger())
           .borderRadius(AppRadius.PILL)
           .onClick(() => this.removeRecord())
         Button('返回')
@@ -221,15 +281,18 @@ struct RecordDetail {
         this.record = null;
         return;
       }
-      const results = await Promise.all([
-        this.categoryRepository.findById(latestRecord.categoryId),
-        this.accountRepository.findById(latestRecord.accountId)
-      ]);
-      const category = results[0];
-      const account = results[1];
+      const category = await this.categoryRepository.findById(latestRecord.categoryId);
+      const account = await this.accountRepository.findById(latestRecord.accountId);
+      const salarySettings = await this.salaryRepository.load(getContext(this));
+      const monthSummary = await this.recordRepository.monthSummary(DateUtil.startOfMonth(latestRecord.recordTime), DateUtil.startOfNextMonth(latestRecord.recordTime));
       this.record = latestRecord;
       this.categoryName = category ? category.name : '';
       this.accountName = account ? account.name : '';
+      this.salarySettings = salarySettings;
+      this.salaryInsight = SalaryInsightService.build(salarySettings, monthSummary.expense, latestRecord.recordTime);
+      this.transferAccountName = latestRecord.transferAccountId
+        ? (await this.accountRepository.findById(latestRecord.transferAccountId))?.name || ''
+        : '';
     } catch (error) {
       ToastUtil.show('账单加载失败，请重试');
     }
@@ -244,6 +307,7 @@ struct RecordDetail {
       await AppDatabase.getInstance().init(getContext(this));
       await this.recordRepository.deleteById(record.id);
       await AppState.getInstance().refreshAll();
+      await this.refreshSpendingCard();
       ToastUtil.show('账单已删除');
       router.back();
     } catch (error) {
@@ -257,6 +321,14 @@ struct RecordDetail {
       return;
     }
     router.pushUrl({ url: ROUTES.RECORD_EDIT, params: { recordId: record.id } });
+  }
+
+  private async refreshSpendingCard(): Promise<void> {
+    try {
+      await SpendingCardService.refreshKnownForms(getContext(this));
+    } catch (error) {
+      // Card refresh is best-effort; the system scheduled update will retry later.
+    }
   }
 
   private recordType(): RecordType {
@@ -300,6 +372,7 @@ struct RecordDetail {
     this.record = cached;
     this.categoryName = cached.categoryName;
     this.accountName = cached.accountName;
+    this.transferAccountName = cached.transferAccountName || '';
   }
 
   private cachedRecord(): RecordListItem | null {
@@ -321,6 +394,11 @@ struct RecordDetail {
   private displayAccountName(): string {
     const cached = this.cachedRecord();
     return cached ? cached.accountName : this.accountName || '默认账户';
+  }
+
+  private displayTransferAccountName(): string {
+    const cached = this.cachedRecord();
+    return cached ? cached.transferAccountName || '未设置账户' : this.transferAccountName || '未设置账户';
   }
 
   private typeLabel(): string {

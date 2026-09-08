@@ -77,9 +77,41 @@ export class AppDatabase {
     for (const sql of CREATE_TABLE_SQL) {
       await store.executeSql(sql);
     }
+    await this.migrateSchema();
     for (const sql of CREATE_INDEX_SQL) {
       await store.executeSql(sql);
     }
+  }
+
+  private async migrateSchema(): Promise<void> {
+    const store = this.getStore();
+    if (!await this.hasColumn('t_record', 'ledger_name')) {
+      await store.executeSql("ALTER TABLE t_record ADD COLUMN ledger_name TEXT NOT NULL DEFAULT '日常账本'");
+    }
+    await store.executeSql(
+      `UPDATE t_record
+       SET ledger_name = substr(
+         remark,
+         instr(remark, '[账本:') + 4,
+         instr(substr(remark, instr(remark, '[账本:') + 4), ']') - 1
+       )
+       WHERE remark LIKE '%[账本:%]%'
+         AND (ledger_name IS NULL OR ledger_name = '' OR ledger_name = '日常账本')`
+    );
+    await store.executeSql("UPDATE t_record SET ledger_name = '日常账本' WHERE ledger_name IS NULL OR trim(ledger_name) = ''");
+  }
+
+  private async hasColumn(tableName: string, columnName: string): Promise<boolean> {
+    const result = await this.getStore().querySql(`PRAGMA table_info(${tableName})`);
+    let found = false;
+    while (result.goToNextRow()) {
+      if (result.getString(result.getColumnIndex('name')) === columnName) {
+        found = true;
+        break;
+      }
+    }
+    result.close();
+    return found;
   }
 
   private async seedDefaults(): Promise<void> {
@@ -112,6 +144,16 @@ export class AppDatabase {
       for (const item of accounts) {
         await store.insert('t_account', this.accountToBucket(item));
       }
+    }
+
+    const templateResult = await store.querySql('SELECT COUNT(1) AS count FROM t_record_template');
+    let templateCount = 0;
+    if (templateResult.goToFirstRow()) {
+      templateCount = templateResult.getLong(templateResult.getColumnIndex('count'));
+    }
+    templateResult.close();
+    if (templateCount === 0) {
+      await this.seedRecordTemplates(now);
     }
 
     const ruleResult = await store.querySql('SELECT COUNT(1) AS count FROM t_auto_rule');
@@ -157,6 +199,69 @@ export class AppDatabase {
       }));
       sortOrder++;
     }
+  }
+
+  private async seedRecordTemplates(now: number): Promise<void> {
+    const store = this.getStore();
+    const preferredAccountId = await this.loadAccountId('微信');
+    const accountId = preferredAccountId > 0 ? preferredAccountId : await this.loadFirstAccountId();
+    const names: string[] = ['早餐', '地铁', '日用品', '工资'];
+    const categoryNames: string[] = ['餐饮', '交通', '日用', '工资'];
+    const types: RecordType[] = [RecordType.EXPENSE, RecordType.EXPENSE, RecordType.EXPENSE, RecordType.INCOME];
+    const amounts: number[] = [12, 3, 30, 5000];
+    for (let index = 0; index < names.length; index++) {
+      const categoryId = await this.loadCategoryId(categoryNames[index], types[index]);
+      if (categoryId <= 0 || accountId <= 0) {
+        continue;
+      }
+      const bucket: relationalStore.ValuesBucket = {};
+      bucket['name'] = names[index];
+      bucket['type'] = types[index];
+      bucket['amount'] = amounts[index];
+      bucket['category_id'] = categoryId;
+      bucket['account_id'] = accountId;
+      bucket['remark'] = names[index];
+      bucket['use_count'] = 0;
+      bucket['create_time'] = now + index;
+      bucket['update_time'] = now + index;
+      await store.insert('t_record_template', bucket);
+    }
+  }
+
+  private async loadCategoryId(name: string, type: RecordType): Promise<number> {
+    const result = await this.getStore().querySql(
+      'SELECT id FROM t_category WHERE name = ? AND type = ? ORDER BY id ASC LIMIT 1',
+      [name, type]
+    );
+    let id = 0;
+    if (result.goToFirstRow()) {
+      id = result.getLong(result.getColumnIndex('id'));
+    }
+    result.close();
+    return id;
+  }
+
+  private async loadAccountId(name: string): Promise<number> {
+    const result = await this.getStore().querySql(
+      'SELECT id FROM t_account WHERE name = ? ORDER BY id ASC LIMIT 1',
+      [name]
+    );
+    let id = 0;
+    if (result.goToFirstRow()) {
+      id = result.getLong(result.getColumnIndex('id'));
+    }
+    result.close();
+    return id;
+  }
+
+  private async loadFirstAccountId(): Promise<number> {
+    const result = await this.getStore().querySql('SELECT id FROM t_account ORDER BY sort_order ASC, id ASC LIMIT 1');
+    let id = 0;
+    if (result.goToFirstRow()) {
+      id = result.getLong(result.getColumnIndex('id'));
+    }
+    result.close();
+    return id;
   }
 
   private categoryToBucket(item: CategoryModel): relationalStore.ValuesBucket {

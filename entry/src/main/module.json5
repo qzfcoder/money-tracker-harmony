@@ -33,6 +33,21 @@
           }
         ]
       }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "SpendingFormAbility",
+        "srcEntry": "./ets/widget/SpendingFormAbility.ets",
+        "label": "$string:spending_card_name",
+        "description": "$string:spending_card_desc",
+        "type": "form",
+        "metadata": [
+          {
+            "name": "ohos.extension.form",
+            "resource": "$profile:form_config"
+          }
+        ]
+      }
     ]
   }
 }

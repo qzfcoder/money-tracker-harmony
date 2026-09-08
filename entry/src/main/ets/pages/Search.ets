@@ -12,6 +12,7 @@ import { NumberUtil } from '../utils/NumberUtil';
 import { RecordItem } from '../components/RecordItem';
 import { AppDatabase } from '../database/AppDatabase';
 import { ToastUtil } from '../utils/ToastUtil';
+import { AppState } from '../viewmodel/AppState';
 
 interface DatePickerResult {
   year?: number;
@@ -58,6 +59,8 @@ struct SearchPage {
   @State resultExpense: number = 0;
   @State resultBalance: number = 0;
   @State loading: boolean = false;
+  @State selectMode: boolean = false;
+  @State selectedRecordIds: number[] = [];
 
   aboutToAppear(): void {
     this.loadData();
@@ -73,6 +76,9 @@ struct SearchPage {
           this.FilterPanel()
           this.RangePanel()
           this.ResultHeader()
+          if (this.selectMode) {
+            this.BatchBar()
+          }
           this.ResultSummary()
           this.ResultList()
         }
@@ -298,15 +304,61 @@ struct SearchPage {
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.INK)
       Blank()
-      Text(`${this.results.length} 条`)
+      Text(this.selectMode ? '取消' : `${this.results.length} 条 · 多选`)
         .fontSize(13)
         .fontWeight(FontWeight.Medium)
-        .fontColor(AppColors.LEDGER)
+        .fontColor(this.selectMode ? AppColors.EXPENSE : AppColors.LEDGER)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor(AppColors.SURFACE_TINT)
+        .backgroundColor(this.selectMode ? AppColors.softDanger() : AppColors.SURFACE_TINT)
         .borderRadius(AppRadius.PILL)
+        .onClick(() => {
+          if (this.results.length === 0) {
+            return;
+          }
+          if (this.selectMode) {
+            this.clearSelection();
+          } else {
+            this.selectMode = true;
+            this.selectedRecordIds = [];
+          }
+        })
     }
     .width('100%')
+  }
+
+  @Builder
+  private BatchBar() {
+    Row({ space: 10 }) {
+      Text(`已选 ${this.selectedRecordIds.length} 笔`)
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+        .layoutWeight(1)
+        .maxLines(1)
+      Button(this.selectedRecordIds.length === this.selectableResultCount() ? '取消全选' : '全选')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.CHART_BLUE)
+        .height(34)
+        .width(84)
+        .backgroundColor(AppColors.SURFACE_TINT)
+        .borderRadius(AppRadius.PILL)
+        .onClick(() => this.toggleAllResults())
+      Button('删除')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.SURFACE)
+        .height(34)
+        .width(72)
+        .backgroundColor(this.selectedRecordIds.length > 0 ? AppColors.EXPENSE : AppColors.FAINT)
+        .borderRadius(AppRadius.PILL)
+        .onClick(() => this.deleteSelectedRecords())
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(18)
+    .shadow({ radius: 14, color: AppColors.SHADOW, offsetY: 6 })
   }
 
   @Builder
@@ -356,11 +408,31 @@ struct SearchPage {
         this.EmptyState('没有匹配的账单', '换个关键词或时间范围再试试')
       } else {
         ForEach(this.results, (item: RecordListItem) => {
-          Column() {
-            RecordItem({ item })
+          Row({ space: 10 }) {
+            if (this.selectMode) {
+              Text(this.isRecordSelected(item.id || 0) ? '✓' : '')
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppColors.SURFACE)
+                .width(30)
+                .height(30)
+                .textAlign(TextAlign.Center)
+                .backgroundColor(this.isRecordSelected(item.id || 0) ? AppColors.CHART_BLUE : AppColors.SURFACE_SOFT)
+                .border({ width: 1, color: this.isRecordSelected(item.id || 0) ? AppColors.CHART_BLUE : AppColors.LINE })
+                .borderRadius(15)
+                .margin({ top: 18 })
+            }
+            Column() {
+              RecordItem({ item })
+            }
+            .layoutWeight(1)
           }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
           .onClick(() => {
-            if (item.id) {
+            if (this.selectMode) {
+              this.toggleRecordSelection(item.id || 0);
+            } else if (item.id) {
               router.pushUrl({ url: ROUTES.RECORD_DETAIL, params: { recordId: item.id } });
             }
           })
@@ -521,9 +593,11 @@ struct SearchPage {
       }
       this.results = await this.recordRepository.searchRecords(options);
       this.refreshResultSummary();
+      this.syncSelectedRecords();
     } catch (error) {
       this.results = [];
       this.refreshResultSummary();
+      this.syncSelectedRecords();
     } finally {
       this.loading = false;
     }
@@ -564,8 +638,80 @@ struct SearchPage {
     this.selectedCategoryId = 0;
     this.anchorTime = Date.now();
     this.customEditorVisible = false;
+    this.clearSelection();
     this.applyRange();
     this.runSearch();
+  }
+
+  private isRecordSelected(id: number): boolean {
+    return id > 0 && this.selectedRecordIds.indexOf(id) >= 0;
+  }
+
+  private toggleRecordSelection(id: number): void {
+    if (id <= 0) {
+      return;
+    }
+    const index = this.selectedRecordIds.indexOf(id);
+    const next = this.selectedRecordIds.slice();
+    if (index >= 0) {
+      next.splice(index, 1);
+    } else {
+      next.push(id);
+    }
+    this.selectedRecordIds = next;
+  }
+
+  private toggleAllResults(): void {
+    const ids = this.resultIds();
+    if (ids.length > 0 && this.selectedRecordIds.length === ids.length) {
+      this.selectedRecordIds = [];
+      return;
+    }
+    this.selectedRecordIds = ids;
+  }
+
+  private clearSelection(): void {
+    this.selectMode = false;
+    this.selectedRecordIds = [];
+  }
+
+  private async deleteSelectedRecords(): Promise<void> {
+    if (this.selectedRecordIds.length === 0) {
+      ToastUtil.show('请先选择账单');
+      return;
+    }
+    const ids = this.selectedRecordIds.slice();
+    try {
+      const deleted = await this.recordRepository.deleteMany(ids);
+      await AppState.getInstance().refreshAfterRecordChange();
+      this.clearSelection();
+      await this.runSearch();
+      ToastUtil.show(`已删除 ${deleted} 笔账单`);
+    } catch (error) {
+      ToastUtil.show('删除失败，请稍后重试');
+    }
+  }
+
+  private syncSelectedRecords(): void {
+    if (!this.selectMode || this.selectedRecordIds.length === 0) {
+      return;
+    }
+    const ids = this.resultIds();
+    this.selectedRecordIds = this.selectedRecordIds.filter((id: number) => ids.indexOf(id) >= 0);
+  }
+
+  private selectableResultCount(): number {
+    return this.resultIds().length;
+  }
+
+  private resultIds(): number[] {
+    const ids: number[] = [];
+    this.results.forEach((item: RecordListItem) => {
+      if (item.id && item.id > 0) {
+        ids.push(item.id);
+      }
+    });
+    return ids;
   }
 
   private applyRange(): void {

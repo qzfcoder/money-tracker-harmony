@@ -12,6 +12,7 @@ export interface AutoBookkeepingSettings {
   autoReviewEnabled: boolean;
   autoDefaultAccountId: number;
   alipayBillImportEnabled: boolean;
+  floatingBallEnabled: boolean;
 }
 
 export interface AppSettingsData extends AutoBookkeepingSettings {
@@ -30,7 +31,8 @@ export class SettingsRepository {
       autoBookkeepingEnabled: false,
       autoReviewEnabled: true,
       autoDefaultAccountId: 0,
-      alipayBillImportEnabled: false
+      alipayBillImportEnabled: false,
+      floatingBallEnabled: false
     };
   }
 
@@ -43,7 +45,8 @@ export class SettingsRepository {
       autoBookkeepingEnabled: store.getSync('autoBookkeepingEnabled', defaults.autoBookkeepingEnabled) as boolean,
       autoReviewEnabled: store.getSync('autoReviewEnabled', defaults.autoReviewEnabled) as boolean,
       autoDefaultAccountId: store.getSync('autoDefaultAccountId', defaults.autoDefaultAccountId) as number,
-      alipayBillImportEnabled: store.getSync('alipayBillImportEnabled', defaults.alipayBillImportEnabled) as boolean
+      alipayBillImportEnabled: store.getSync('alipayBillImportEnabled', defaults.alipayBillImportEnabled) as boolean,
+      floatingBallEnabled: store.getSync('floatingBallEnabled', defaults.floatingBallEnabled) as boolean
     };
   }
 
@@ -67,6 +70,7 @@ export class SettingsRepository {
     store.putSync('autoReviewEnabled', settings.autoReviewEnabled);
     store.putSync('autoDefaultAccountId', settings.autoDefaultAccountId);
     store.putSync('alipayBillImportEnabled', settings.alipayBillImportEnabled);
+    store.putSync('floatingBallEnabled', settings.floatingBallEnabled);
     await store.flush();
   }
 

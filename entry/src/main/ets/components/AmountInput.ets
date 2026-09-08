@@ -24,6 +24,7 @@ export struct AmountInput {
         .onChange((value: string) => {
           this.amountText = this.normalize(value);
         })
+
     }
   }
 

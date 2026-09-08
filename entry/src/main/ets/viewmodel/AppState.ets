@@ -27,6 +27,7 @@ export class AppState {
   monthBudgetProgress: number = 0;
   totalAssets: number = 0;
   pendingAutoBillCount: number = 0;
+  ledgerFilter: string = '';
   recordList: RecordListItem[] = [];
   accountList: AccountModel[] = [];
   lastUpdatedRecord: RecordListItem | null = null;
@@ -59,9 +60,21 @@ export class AppState {
     ]);
   }
 
+  setLedgerFilter(ledgerName: string): void {
+    this.ledgerFilter = ledgerName.trim();
+  }
+
   applyRecordUpdate(record: RecordListItem): void {
     this.lastUpdatedRecord = record;
     const index = this.recordList.findIndex((item: RecordListItem) => item.id === record.id);
+    if (this.ledgerFilter.length > 0 && record.ledgerName !== this.ledgerFilter) {
+      if (index >= 0) {
+        const nextList = this.recordList.slice();
+        nextList.splice(index, 1);
+        this.recordList = nextList;
+      }
+      return;
+    }
     if (index < 0) {
       return;
     }
@@ -73,15 +86,17 @@ export class AppState {
   async refreshTodaySummary(): Promise<void> {
     const start = DateUtil.startOfDay();
     const end = DateUtil.addDays(start, 1);
-    const summary = await this.recordRepository.monthSummary(start, end);
+    const summary = await this.recordRepository.monthSummary(start, end, this.ledgerFilter);
     this.todayIncome = summary.income;
     this.todayExpense = summary.expense;
     this.todayBalance = summary.balance;
-    this.todayRecordCount = await this.recordRepository.recordCount(start, end);
+    this.todayRecordCount = await this.recordRepository.recordCount(start, end, this.ledgerFilter);
   }
 
   async refreshMonthSummary(): Promise<void> {
-    const summary = await this.recordRepository.monthSummary(DateUtil.startOfMonth(), DateUtil.startOfNextMonth());
+    const summary = await this.recordRepository.monthSummary(
+      DateUtil.startOfMonth(), DateUtil.startOfNextMonth(), this.ledgerFilter
+    );
     this.monthIncome = summary.income;
     this.monthExpense = summary.expense;
     this.monthBalance = summary.balance;
@@ -101,7 +116,9 @@ export class AppState {
   }
 
   async refreshRecords(): Promise<void> {
-    this.recordList = await this.recordRepository.listRecent(30, 0);
+    this.recordList = this.ledgerFilter.length > 0
+      ? await this.recordRepository.listRecentByLedger(this.ledgerFilter, 30, 0)
+      : await this.recordRepository.listRecent(30, 0);
   }
 
   async refreshAccountList(): Promise<void> {

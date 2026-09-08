@@ -86,7 +86,11 @@ try {
       Add-Failure 'module.json5 requestPermissions must be empty for this release'
     }
     if ($module.module.PSObject.Properties.Name -contains 'extensionAbilities') {
-      Add-Failure 'module.json5 must not declare extensionAbilities for this release'
+      foreach ($extension in $module.module.extensionAbilities) {
+        if ($extension.type -ne 'form' -or $extension.name -ne 'SpendingFormAbility') {
+          Add-Failure "Only the low-risk spending form extension is allowed for this release: $($extension.name)"
+        }
+      }
     }
   }
 
@@ -270,7 +274,7 @@ try {
   Write-Output "Integer-only inputs: $($numberMatches.Count) sort fields"
   Write-Output 'Amount validation: shared'
   Write-Output 'Permissions: empty'
-  Write-Output 'Extensions: none'
+  Write-Output 'Extensions: spending form only'
   Write-Output 'Release feature flags: safe'
   Write-Output 'Routes/pages: consistent'
 } finally {

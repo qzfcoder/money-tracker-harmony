@@ -8,6 +8,9 @@ import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { AppDatabase } from '../database/AppDatabase';
+import { AppState } from '../viewmodel/AppState';
+import { DataBackupService } from '../service/DataBackupService';
+import { LedgerCsvImportService } from '../service/LedgerCsvImportService';
 
 enum ExportScope {
   MONTH = 'month',
@@ -19,6 +22,18 @@ interface DatePickerResult {
   year?: number;
   month?: number;
   day?: number;
+}
+
+interface XlsxZipEntry {
+  name: string;
+  content: string;
+}
+
+interface XlsxZipInfo {
+  name: string;
+  crc: number;
+  size: number;
+  offset: number;
 }
 
 @Entry
@@ -37,6 +52,7 @@ struct DataExport {
   @State draftCustomStartTime: number = DateUtil.startOfMonth();
   @State draftCustomEndTime: number = DateUtil.startOfDay();
   @State customEditorVisible: boolean = false;
+  @State restoreConfirming: boolean = false;
 
   aboutToAppear(): void {
     this.loadRecords();
@@ -49,6 +65,7 @@ struct DataExport {
         Column({ space: 16 }) {
           this.SummaryCard()
           this.ScopeCard()
+          this.DataToolsCard()
           this.PreviewCard()
         }
         .width('100%')
@@ -83,7 +100,7 @@ struct DataExport {
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.INK)
           .width('100%')
-        Text('保存 CSV 账单文件')
+        Text('导出、导入与备份账单数据')
           .fontSize(13)
           .fontColor(AppColors.MUTED)
           .width('100%')
@@ -301,15 +318,78 @@ struct DataExport {
         .backgroundColor(AppColors.SURFACE_SOFT)
         .borderRadius(18)
 
-      Button('保存 CSV 文件')
-        .fontSize(15)
+      Row({ space: 10 }) {
+        Button('保存 CSV')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .height(48)
+          .layoutWeight(1)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.saveCsv())
+        Button('保存 XLSX')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.SURFACE)
+          .height(48)
+          .layoutWeight(1)
+          .backgroundColor(AppColors.CHART_BLUE)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.saveExcelWorkbook())
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
+  private DataToolsCard() {
+    Column({ space: 12 }) {
+      Text('数据工具')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.INK)
+        .width('100%')
+      Text('备份文件可在换机或重装后恢复，导入仅识别一页账导出的 CSV。')
+        .fontSize(12)
+        .fontColor(AppColors.MUTED)
+        .lineHeight(18)
+        .width('100%')
+      Row({ space: 10 }) {
+        Button('备份数据')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.CHART_BLUE)
+          .height(44)
+          .layoutWeight(1)
+          .backgroundColor(AppColors.SURFACE_TINT)
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.backupData())
+        Button(this.restoreConfirming ? '再次确认恢复' : '恢复数据')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.EXPENSE)
+          .height(44)
+          .layoutWeight(1)
+          .backgroundColor(AppColors.softDanger())
+          .borderRadius(AppRadius.PILL)
+          .onClick(() => this.confirmRestore())
+      }
+      .width('100%')
+      Button('导入一页账 CSV')
+        .fontSize(14)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.SURFACE)
-        .height(48)
+        .height(44)
         .width('100%')
-        .backgroundColor(AppColors.CHART_BLUE)
+        .backgroundColor(AppColors.CHART_GREEN)
         .borderRadius(AppRadius.PILL)
-        .onClick(() => this.saveCsv())
+        .onClick(() => this.importCsv())
     }
     .width('100%')
     .padding(16)
@@ -356,6 +436,77 @@ struct DataExport {
     }
   }
 
+  private async saveExcelWorkbook(): Promise<void> {
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      this.records = await this.loadScopedRecords();
+      this.csvText = this.buildCsv(this.records);
+      this.refreshTotals();
+      const context = getContext(this) as common.UIAbilityContext;
+      const options = new picker.DocumentSaveOptions();
+      options.newFileNames = [`一页账-${this.fileNameSuffix()}.xlsx`];
+      options.fileSuffixChoices = ['Excel 工作簿|.xlsx'];
+      const uris = await new picker.DocumentViewPicker(context).save(options);
+      if (uris.length === 0) {
+        ToastUtil.show('未保存 Excel 文件');
+        return;
+      }
+      const file = fileIo.openSync(uris[0], fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      try {
+        fileIo.writeSync(file.fd, this.buildXlsxWorkbook(this.records));
+      } finally {
+        fileIo.closeSync(file);
+      }
+      ToastUtil.show(`Excel 已保存：${uris[0]}`);
+    } catch (error) {
+      ToastUtil.show(`Excel 未保存：${ToastUtil.error(error)}`);
+    }
+  }
+
+  private async backupData(): Promise<void> {
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      const result = await DataBackupService.saveToFile(getContext(this) as common.UIAbilityContext);
+      ToastUtil.show(`备份完成：${result.recordCount} 条账单`);
+    } catch (error) {
+      ToastUtil.show(`备份失败：${ToastUtil.error(error)}`);
+    }
+  }
+
+  private async restoreData(): Promise<void> {
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      const result = await DataBackupService.restoreFromFile(getContext(this) as common.UIAbilityContext);
+      await AppState.getInstance().refreshAll();
+      await this.loadRecords();
+      ToastUtil.show(`恢复完成：${result.recordCount} 条账单`);
+    } catch (error) {
+      ToastUtil.show(`恢复失败：${ToastUtil.error(error)}`);
+    }
+  }
+
+  private confirmRestore(): void {
+    if (!this.restoreConfirming) {
+      this.restoreConfirming = true;
+      ToastUtil.show('恢复会覆盖当前账单、账户、分类和预算，再次点击确认');
+      return;
+    }
+    this.restoreConfirming = false;
+    this.restoreData();
+  }
+
+  private async importCsv(): Promise<void> {
+    try {
+      await AppDatabase.getInstance().init(getContext(this));
+      const result = await new LedgerCsvImportService().pickAndImport(getContext(this) as common.UIAbilityContext);
+      await AppState.getInstance().refreshAll();
+      await this.loadRecords();
+      ToastUtil.show(`导入完成：${result.importedRows} 条，跳过 ${result.skippedRows} 条`);
+    } catch (error) {
+      ToastUtil.show(`导入失败：${ToastUtil.error(error)}`);
+    }
+  }
+
   private async loadScopedRecords(): Promise<RecordListItem[]> {
     if (this.exportScope === ExportScope.MONTH) {
       return await this.repository.listByRange(DateUtil.startOfMonth(), DateUtil.startOfNextMonth(), 1000, 0);
@@ -389,6 +540,182 @@ struct DataExport {
       ].map((value: string) => this.escapeCsv(value)).join(','));
     });
     return rows.join('\n');
+  }
+
+  private buildXlsxWorkbook(records: RecordListItem[]): ArrayBuffer {
+    const entries: XlsxZipEntry[] = [
+      { name: '[Content_Types].xml', content: this.xlsxContentTypes() },
+      { name: '_rels/.rels', content: this.xlsxRootRels() },
+      { name: 'xl/workbook.xml', content: this.xlsxWorkbook() },
+      { name: 'xl/_rels/workbook.xml.rels', content: this.xlsxWorkbookRels() },
+      { name: 'xl/styles.xml', content: this.xlsxStyles() },
+      { name: 'xl/worksheets/sheet1.xml', content: this.xlsxSheet(records) }
+    ];
+    return this.zipStore(entries);
+  }
+
+  private xlsxSheet(records: RecordListItem[]): string {
+    const rows: string[] = [this.xlsxRow(1, ['日期', '类型', '分类', '金额', '账户', '备注'])];
+    records.forEach((item: RecordListItem, index: number) => {
+      rows.push(this.xlsxRow(index + 2, [
+        DateUtil.dayLabel(item.recordTime) + ' ' + DateUtil.timeLabel(item.recordTime),
+        this.typeLabel(item.type),
+        item.categoryName,
+        `${item.type === RecordType.EXPENSE ? '-' : ''}${NumberUtil.plainMoney(item.amount)}`,
+        item.accountName,
+        item.remark
+      ]));
+    });
+    const dimension = `A1:F${Math.max(1, records.length + 1)}`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="${dimension}"/><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="3" width="12" customWidth="1"/><col min="4" max="4" width="14" customWidth="1"/><col min="5" max="6" width="18" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
+  }
+
+  private xlsxRow(rowIndex: number, values: string[]): string {
+    const cells = values.map((value: string, index: number) => {
+      const ref = `${this.xlsxColumnName(index)}${rowIndex}`;
+      return `<c r="${ref}" t="inlineStr"><is><t>${this.escapeXml(value)}</t></is></c>`;
+    }).join('');
+    return `<row r="${rowIndex}">${cells}</row>`;
+  }
+
+  private xlsxColumnName(index: number): string {
+    return String.fromCharCode('A'.charCodeAt(0) + index);
+  }
+
+  private xlsxContentTypes(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>';
+  }
+
+  private xlsxRootRels(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  }
+
+  private xlsxWorkbook(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="账单" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  }
+
+  private xlsxWorkbookRels(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+  }
+
+  private xlsxStyles(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs></styleSheet>';
+  }
+
+  private zipStore(entries: XlsxZipEntry[]): ArrayBuffer {
+    const bytes: number[] = [];
+    const central: XlsxZipInfo[] = [];
+    entries.forEach((entry: XlsxZipEntry) => {
+      const nameBytes = this.utf8Bytes(entry.name);
+      const contentBytes = this.utf8Bytes(entry.content);
+      const crc = this.crc32(contentBytes);
+      const offset = bytes.length;
+      this.pushUInt32(bytes, 0x04034b50);
+      this.pushUInt16(bytes, 20);
+      this.pushUInt16(bytes, 2048);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt32(bytes, crc);
+      this.pushUInt32(bytes, contentBytes.length);
+      this.pushUInt32(bytes, contentBytes.length);
+      this.pushUInt16(bytes, nameBytes.length);
+      this.pushUInt16(bytes, 0);
+      this.pushBytes(bytes, nameBytes);
+      this.pushBytes(bytes, contentBytes);
+      central.push({ name: entry.name, crc, size: contentBytes.length, offset });
+    });
+
+    const centralOffset = bytes.length;
+    central.forEach((info: XlsxZipInfo) => {
+      const nameBytes = this.utf8Bytes(info.name);
+      this.pushUInt32(bytes, 0x02014b50);
+      this.pushUInt16(bytes, 20);
+      this.pushUInt16(bytes, 20);
+      this.pushUInt16(bytes, 2048);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt32(bytes, info.crc);
+      this.pushUInt32(bytes, info.size);
+      this.pushUInt32(bytes, info.size);
+      this.pushUInt16(bytes, nameBytes.length);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt16(bytes, 0);
+      this.pushUInt32(bytes, 0);
+      this.pushUInt32(bytes, info.offset);
+      this.pushBytes(bytes, nameBytes);
+    });
+    const centralSize = bytes.length - centralOffset;
+    this.pushUInt32(bytes, 0x06054b50);
+    this.pushUInt16(bytes, 0);
+    this.pushUInt16(bytes, 0);
+    this.pushUInt16(bytes, central.length);
+    this.pushUInt16(bytes, central.length);
+    this.pushUInt32(bytes, centralSize);
+    this.pushUInt32(bytes, centralOffset);
+    this.pushUInt16(bytes, 0);
+
+    const buffer = new Uint8Array(bytes.length);
+    bytes.forEach((value: number, index: number) => {
+      buffer[index] = value;
+    });
+    return buffer.buffer;
+  }
+
+  private utf8Bytes(value: string): number[] {
+    const bytes: number[] = [];
+    for (let index = 0; index < value.length; index++) {
+      let code = value.charCodeAt(index);
+      if (code >= 0xD800 && code <= 0xDBFF && index + 1 < value.length) {
+        const next = value.charCodeAt(index + 1);
+        if (next >= 0xDC00 && next <= 0xDFFF) {
+          code = 0x10000 + ((code - 0xD800) * 0x400) + (next - 0xDC00);
+          index++;
+        }
+      }
+      if (code < 0x80) {
+        bytes.push(code);
+      } else if (code < 0x800) {
+        bytes.push(0xC0 | (code >> 6), 0x80 | (code & 0x3F));
+      } else if (code < 0x10000) {
+        bytes.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
+      } else {
+        bytes.push(0xF0 | (code >> 18), 0x80 | ((code >> 12) & 0x3F), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
+      }
+    }
+    return bytes;
+  }
+
+  private crc32(data: number[]): number {
+    let crc = 0xFFFFFFFF;
+    data.forEach((value: number) => {
+      crc = crc ^ value;
+      for (let bit = 0; bit < 8; bit++) {
+        crc = (crc >>> 1) ^ ((crc & 1) > 0 ? 0xEDB88320 : 0);
+      }
+    });
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  private pushBytes(target: number[], source: number[]): void {
+    source.forEach((value: number) => {
+      target.push(value & 0xFF);
+    });
+  }
+
+  private pushUInt16(bytes: number[], value: number): void {
+    bytes.push(value & 0xFF, (value >>> 8) & 0xFF);
+  }
+
+  private pushUInt32(bytes: number[], value: number): void {
+    bytes.push(value & 0xFF, (value >>> 8) & 0xFF, (value >>> 16) & 0xFF, (value >>> 24) & 0xFF);
+  }
+
+  private escapeXml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
   }
 
   private escapeCsv(value: string): string {

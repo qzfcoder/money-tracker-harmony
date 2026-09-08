@@ -25,6 +25,9 @@ struct Assets {
         Column({ space: 18 }) {
           this.Header('资产')
           this.SummaryCard()
+          if (this.vm.liabilityAccountCount > 0) {
+            this.LiabilityInsightCard()
+          }
           this.SectionTitle('账户列表', `${this.vm.accounts.length} 个`)
           this.AccountGrid()
         }
@@ -163,6 +166,63 @@ struct Assets {
   }
 
   @Builder
+  private LiabilityInsightCard() {
+    Column({ space: 14 }) {
+      Row() {
+        Column({ space: 4 }) {
+          Text('负债观察')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.INK)
+            .width('100%')
+          Text(this.liabilityInsightText())
+            .fontSize(12)
+            .fontColor(AppColors.MUTED)
+            .width('100%')
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(`${this.liabilityRatio()}%`)
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.liabilityRatioColor())
+          .maxLines(1)
+          .constraintSize({ maxWidth: 92 })
+      }
+      .width('100%')
+
+      Stack({ alignContent: Alignment.Start }) {
+        Column()
+          .height(9)
+          .width('100%')
+          .backgroundColor(AppColors.TRACK)
+          .borderRadius(5)
+        Column()
+          .height(9)
+          .width(`${Math.min(100, this.liabilityRatio())}%`)
+          .backgroundColor(this.liabilityRatioColor())
+          .borderRadius(5)
+      }
+      .width('100%')
+      .height(9)
+
+      Row({ space: 8 }) {
+        this.AssetMetric('负债合计', NumberUtil.compactMoney(this.vm.liabilityBalance), AppColors.EXPENSE, AppColors.softDanger())
+        this.AssetMetric('净资产', NumberUtil.compactMoney(this.vm.totalAssets), AppColors.CHART_BLUE, AppColors.SURFACE_TINT)
+        this.AssetMetric('最大负债', this.largestLiabilityName(), this.liabilityRatioColor(), AppColors.SURFACE_SOFT)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.SURFACE)
+    .borderRadius(AppRadius.CARD)
+    .shadow({ radius: 20, color: AppColors.SHADOW, offsetY: 8 })
+  }
+
+  @Builder
   private SectionTitle(title: string, badge: string) {
     Row() {
       Text(title)
@@ -232,6 +292,7 @@ struct Assets {
     .borderRadius(AppRadius.CARD)
     .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
     .margin({ bottom: 12 })
+    .onClick(() => router.pushUrl({ url: ROUTES.ACCOUNT_LEDGER, params: { accountId: item.id || 0 } }))
   }
 
   private cardWidth(): string {
@@ -265,5 +326,64 @@ struct Assets {
       return `负债约为资产的 ${ratio}%，建议优先关注还款安排。`;
     }
     return `负债约为资产的 ${ratio}%，可结合账户列表定期检查余额。`;
+  }
+
+  private liabilityAccounts(): AccountModel[] {
+    return this.vm.accounts.filter((account: AccountModel) => account.isLiability);
+  }
+
+  private largestLiability(): AccountModel | null {
+    const list = this.liabilityAccounts();
+    if (list.length === 0) {
+      return null;
+    }
+    let target = list[0];
+    list.forEach((item: AccountModel) => {
+      if (item.balance > target.balance) {
+        target = item;
+      }
+    });
+    return target;
+  }
+
+  private largestLiabilityName(): string {
+    const account = this.largestLiability();
+    if (!account) {
+      return '无';
+    }
+    return account.name.length > 4 ? `${account.name.substring(0, 4)}…` : account.name;
+  }
+
+  private liabilityRatio(): number {
+    if (this.vm.assetBalance <= 0) {
+      return this.vm.liabilityBalance > 0 ? 100 : 0;
+    }
+    return Math.max(0, Math.round(this.vm.liabilityBalance / this.vm.assetBalance * 100));
+  }
+
+  private liabilityRatioColor(): string {
+    const ratio = this.liabilityRatio();
+    if (ratio >= 80) {
+      return AppColors.EXPENSE;
+    }
+    if (ratio >= 50) {
+      return AppColors.WARNING;
+    }
+    return AppColors.CHART_GREEN;
+  }
+
+  private liabilityInsightText(): string {
+    const largest = this.largestLiability();
+    const ratio = this.liabilityRatio();
+    if (!largest) {
+      return '当前没有负债账户。';
+    }
+    if (ratio >= 80) {
+      return `${largest.name} 是当前最大负债账户，建议优先安排还款。`;
+    }
+    if (ratio >= 50) {
+      return `${largest.name} 占比较高，适合定期核对账单和还款计划。`;
+    }
+    return `负债压力较轻，最大负债账户为 ${largest.name}。`;
   }
 }

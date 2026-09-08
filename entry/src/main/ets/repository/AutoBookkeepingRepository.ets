@@ -164,6 +164,7 @@ export class AutoBookkeepingRepository {
       categoryId: bill.categoryId,
       accountId: bill.accountId,
       recordTime: bill.recordTime,
+      ledgerName: '日常账本',
       remark: bill.remark,
       createTime: bill.createTime,
       updateTime: bill.updateTime
