@@ -325,7 +325,7 @@ struct RecordDetail {
 
   private async refreshSpendingCard(): Promise<void> {
     try {
-      await SpendingCardService.refreshKnownForms(getContext(this));
+      await SpendingCardService.refreshAllForms(getContext(this));
     } catch (error) {
       // Card refresh is best-effort; the system scheduled update will retry later.
     }

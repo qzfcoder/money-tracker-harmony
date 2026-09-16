@@ -745,10 +745,16 @@ struct Index {
                 .fontWeight(FontWeight.Bold)
                 .fontColor(AppColors.INK)
                 .width('100%')
-              Text(`距离发薪 ${this.salaryInsight.paydayCountdown} 天`)
+              Text(`发薪日 ${this.paydayValue()} 号 · ${SalaryInsightService.paydayStatusText(this.salaryInsight.paydayCountdown)}`)
                 .fontSize(12)
                 .fontColor(AppColors.MUTED)
                 .width('100%')
+                .maxLines(2)
+              Text(`本月进度 ${this.salaryInsight.monthProgress}%`)
+                .fontSize(12)
+                .fontColor(AppColors.MUTED)
+                .width('100%')
+                .maxLines(1)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
@@ -765,9 +771,9 @@ struct Index {
         .width('100%')
 
         Row({ space: 8 }) {
-          this.SalaryMetric('已赚', NumberUtil.compactMoney(this.salaryInsight.earnedToDate), AppColors.CHART_GREEN, this.salaryMetricBg(0))
-          this.SalaryMetric('已花', NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, this.salaryMetricBg(1))
-          this.SalaryMetric('还剩', NumberUtil.compactMoney(this.salaryInsight.remainingAfterExpense), this.salaryInsight.remainingAfterExpense >= 0 ? AppColors.CHART_BLUE : AppColors.EXPENSE, this.salaryMetricBg(2))
+          this.SalaryMetric('已赚', () => NumberUtil.compactMoney(this.salaryInsight.earnedToDate), AppColors.CHART_GREEN, this.salaryMetricBg(0))
+          this.SalaryMetric('已花', () => NumberUtil.compactMoney(this.monthExpense), AppColors.CHART_PINK, this.salaryMetricBg(1))
+          this.SalaryMetric('还剩', () => NumberUtil.compactMoney(this.salaryInsight.remainingAfterExpense), this.salaryInsight.remainingAfterExpense >= 0 ? AppColors.CHART_BLUE : AppColors.EXPENSE, this.salaryMetricBg(2))
         }
         .width('100%')
 
@@ -812,7 +818,7 @@ struct Index {
   }
 
   @Builder
-  private SalaryMetric(label: string, value: string, color: string, bgColor: string) {
+  private SalaryMetric(label: string, value: () => string, color: string, bgColor: string) {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
         Column()
@@ -829,8 +835,8 @@ struct Index {
           .fontSize(11)
           .fontColor(AppColors.MUTED)
           .maxLines(1)
-        Text(value)
-          .fontSize(this.salaryMetricFontSize(value))
+        Text(value())
+          .fontSize(this.salaryMetricFontSize(value()))
           .fontWeight(FontWeight.Bold)
           .fontColor(color)
           .width('100%')
@@ -1093,15 +1099,15 @@ struct Index {
       this.SectionTitle('收入拆解', this.salaryModeText())
 
       Row({ space: 8 }) {
-        this.SalaryMetric('自然日均', NumberUtil.compactMoney(this.salaryInsight.naturalDailyIncome), AppColors.CHART_BLUE, this.salaryMetricBg(2))
-        this.SalaryMetric('工作日均', NumberUtil.compactMoney(this.salaryInsight.workDailyIncome), AppColors.CHART_CYAN, this.salaryMetricBg(3))
-        this.SalaryMetric('小时工资', NumberUtil.compactMoney(this.salaryInsight.hourlyIncome), AppColors.CHART_PURPLE, this.salaryMetricBg(4))
+        this.SalaryMetric('自然日均', () => NumberUtil.compactMoney(this.salaryInsight.naturalDailyIncome), AppColors.CHART_BLUE, this.salaryMetricBg(2))
+        this.SalaryMetric('工作日均', () => NumberUtil.compactMoney(this.salaryInsight.workDailyIncome), AppColors.CHART_CYAN, this.salaryMetricBg(3))
+        this.SalaryMetric('小时工资', () => NumberUtil.compactMoney(this.salaryInsight.hourlyIncome), AppColors.CHART_PURPLE, this.salaryMetricBg(4))
       }
       .width('100%')
 
       Row({ space: 8 }) {
-        this.SalaryMetric('今日支出', this.salaryAmountWithWorkTime(this.todayExpense), AppColors.CHART_PINK, this.salaryMetricBg(1))
-        this.SalaryMetric('本月支出', this.salaryAmountWithWorkTime(this.monthExpense), this.salaryPressureColor(), this.salaryMetricBg(5))
+        this.SalaryMetric('今日支出', () => this.salaryAmountWithWorkTime(this.todayExpense), AppColors.CHART_PINK, this.salaryMetricBg(1))
+        this.SalaryMetric('本月支出', () => this.salaryAmountWithWorkTime(this.monthExpense), this.salaryPressureColor(), this.salaryMetricBg(5))
       }
       .width('100%')
     }
@@ -1754,7 +1760,7 @@ struct Index {
 
   private async refreshSpendingCard(): Promise<void> {
     try {
-      await SpendingCardService.refreshKnownForms(getContext(this));
+      await SpendingCardService.refreshAllForms(getContext(this));
     } catch (error) {
       // Card refresh is best-effort; the system scheduled update will retry later.
     }
@@ -1838,6 +1844,10 @@ struct Index {
       return '按时薪';
     }
     return '按月薪';
+  }
+
+  private paydayValue(): number {
+    return SalaryInsightService.normalizePayday(this.salarySettings.payday);
   }
 
   private syncMetricsToAppState(): void {

@@ -348,8 +348,9 @@ struct RecordEdit {
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
         .fontColor(selected ? AppColors.CHART_BLUE : AppColors.EXPENSE)
-        .width(50)
+        .width(58)
         .height(32)
+        .padding({ left: 4, right: 4 })
         .backgroundColor(selected ? '#FFFFFF' : AppColors.softDanger())
         .border({ width: 1, color: selected ? '#FFFFFF' : AppColors.EXPENSE })
         .borderRadius(16)
@@ -835,7 +836,7 @@ struct RecordEdit {
 
   private async refreshSpendingCard(): Promise<void> {
     try {
-      await SpendingCardService.refreshKnownForms(getContext(this));
+      await SpendingCardService.refreshAllForms(getContext(this));
     } catch (error) {
       // Card refresh is best-effort; the system scheduled update will retry later.
     }

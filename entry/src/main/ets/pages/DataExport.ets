@@ -11,6 +11,7 @@ import { AppDatabase } from '../database/AppDatabase';
 import { AppState } from '../viewmodel/AppState';
 import { DataBackupService } from '../service/DataBackupService';
 import { LedgerCsvImportService } from '../service/LedgerCsvImportService';
+import { SpendingCardService } from '../widget/SpendingCardService';
 
 enum ExportScope {
   MONTH = 'month',
@@ -478,6 +479,7 @@ struct DataExport {
       await AppDatabase.getInstance().init(getContext(this));
       const result = await DataBackupService.restoreFromFile(getContext(this) as common.UIAbilityContext);
       await AppState.getInstance().refreshAll();
+      await SpendingCardService.refreshAllForms(getContext(this));
       await this.loadRecords();
       ToastUtil.show(`恢复完成：${result.recordCount} 条账单`);
     } catch (error) {
@@ -500,6 +502,7 @@ struct DataExport {
       await AppDatabase.getInstance().init(getContext(this));
       const result = await new LedgerCsvImportService().pickAndImport(getContext(this) as common.UIAbilityContext);
       await AppState.getInstance().refreshAll();
+      await SpendingCardService.refreshAllForms(getContext(this));
       await this.loadRecords();
       ToastUtil.show(`导入完成：${result.importedRows} 条，跳过 ${result.skippedRows} 条`);
     } catch (error) {

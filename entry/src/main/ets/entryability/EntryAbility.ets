@@ -2,6 +2,7 @@ import { AbilityConstant, Configuration, UIAbility, Want } from '@kit.AbilityKit
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { AppDatabase } from '../database/AppDatabase';
+import { SpendingCardService } from '../widget/SpendingCardService';
 import { ThemeUtil } from '../utils/ThemeUtil';
 
 const DOMAIN = 0x0001;
@@ -20,6 +21,10 @@ export default class EntryAbility extends UIAbility {
     ThemeUtil.updateSystemColorMode(newConfig.colorMode);
   }
 
+  onForeground(): void {
+    this.refreshSpendingCard();
+  }
+
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.savedLaunchWant = want;
     const page = this.resolveLaunchPage(want);
@@ -36,8 +41,9 @@ export default class EntryAbility extends UIAbility {
     this.windowStage = windowStage;
     try {
       await AppDatabase.getInstance().init(this.context);
+      await SpendingCardService.refreshAllForms(this.context);
     } catch (error) {
-      hilog.error(DOMAIN, 'EntryAbility', `database init failed: ${JSON.stringify(error)}`);
+      hilog.error(DOMAIN, 'EntryAbility', `startup card refresh failed: ${JSON.stringify(error)}`);
     }
 
     const page = this.resolveLaunchPage(this.savedLaunchWant) || 'pages/Index';
@@ -51,5 +57,11 @@ export default class EntryAbility extends UIAbility {
   private resolveLaunchPage(want: Want | undefined): string {
     const page = want?.parameters?.['targetPage'];
     return typeof page === 'string' ? page : '';
+  }
+
+  private refreshSpendingCard(): void {
+    SpendingCardService.refreshAllForms(this.context).catch((error: Error) => {
+      hilog.warn(DOMAIN, 'EntryAbility', `foreground card refresh failed: ${error.message}`);
+    });
   }
 }

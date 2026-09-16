@@ -228,12 +228,10 @@ export class RecordRepository {
   }
 
   async monthSummary(startTime: number, endTime: number, ledgerName: string = ''): Promise<MonthSummary> {
-    const startSecond = Math.floor(startTime / 1000);
-    const endSecond = Math.floor(endTime / 1000);
     const normalizedLedger = ledgerName.trim();
     const ledgerClause = normalizedLedger.length > 0 ? ' AND ledger_name = ?' : '';
     const params: (number | string)[] = [
-      RecordType.EXPENSE, RecordType.INCOME, startTime, endTime, startSecond, endSecond
+      RecordType.EXPENSE, RecordType.INCOME, startTime, endTime
     ];
     if (normalizedLedger.length > 0) {
       params.push(normalizedLedger);
@@ -242,8 +240,10 @@ export class RecordRepository {
       `SELECT type, SUM(amount) AS total_amount
       FROM t_record
       WHERE type IN (?, ?) AND (
-        (record_time >= ? AND record_time < ?)
-        OR (record_time >= ? AND record_time < ?)
+        CASE WHEN record_time < ${RecordRepository.MILLIS_THRESHOLD}
+          THEN record_time * 1000 ELSE record_time END >= ?
+        AND CASE WHEN record_time < ${RecordRepository.MILLIS_THRESHOLD}
+          THEN record_time * 1000 ELSE record_time END < ?
       )${ledgerClause}
       GROUP BY type`,
       params

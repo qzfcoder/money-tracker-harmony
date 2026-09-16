@@ -1,0 +1,22 @@
+{
+  "forms": [
+    {
+      "name": "SpendingCard",
+      "displayName": "$string:spending_card_name",
+      "description": "$string:spending_card_desc",
+      "src": "./ets/widget/SpendingCard.ets",
+      "uiSyntax": "arkts",
+      "isDefault": true,
+      "updateEnabled": true,
+      "updateDuration": 1,
+      "defaultDimension": "2*2",
+      "supportDimensions": [
+        "2*2",
+        "2*4"
+      ],
+      "colorMode": "auto",
+      "renderingMode": "fullColor",
+      "enableBlurBackground": true
+    }
+  ]
+}

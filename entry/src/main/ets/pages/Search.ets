@@ -13,6 +13,7 @@ import { RecordItem } from '../components/RecordItem';
 import { AppDatabase } from '../database/AppDatabase';
 import { ToastUtil } from '../utils/ToastUtil';
 import { AppState } from '../viewmodel/AppState';
+import { SpendingCardService } from '../widget/SpendingCardService';
 
 interface DatePickerResult {
   year?: number;
@@ -684,6 +685,7 @@ struct SearchPage {
     try {
       const deleted = await this.recordRepository.deleteMany(ids);
       await AppState.getInstance().refreshAfterRecordChange();
+      await SpendingCardService.refreshAllForms(getContext(this));
       this.clearSelection();
       await this.runSearch();
       ToastUtil.show(`已删除 ${deleted} 笔账单`);

@@ -17,6 +17,7 @@ import { DateUtil } from '../utils/DateUtil';
 import { NumberUtil } from '../utils/NumberUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { AppDatabase } from '../database/AppDatabase';
+import { SpendingCardService } from '../widget/SpendingCardService';
 
 enum AutoPageTab {
   OCR = 'ocr',
@@ -1188,6 +1189,7 @@ struct AutoBookkeeping {
     }
     await AutoBookkeepingService.create(getContext(this)).confirmPending(item.id);
     await AppState.getInstance().refreshAll();
+    await SpendingCardService.refreshAllForms(getContext(this));
     await this.loadAll();
     ToastUtil.show('已确认入账');
   }
