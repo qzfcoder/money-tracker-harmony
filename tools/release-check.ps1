@@ -82,8 +82,10 @@ try {
   $disabledRoutes = New-Object System.Collections.Generic.List[string]
 
   if ($module -ne $null) {
-    if ($module.module.requestPermissions.Count -ne 0) {
-      Add-Failure 'module.json5 requestPermissions must be empty for this release'
+    $permissionNames = @($module.module.requestPermissions | ForEach-Object { $_.name })
+    $unexpectedPermissions = @($permissionNames | Where-Object { $_ -ne 'ohos.permission.INTERNET' })
+    if ($unexpectedPermissions.Count -gt 0) {
+      Add-Failure "Only INTERNET permission is allowed for this release: $($unexpectedPermissions -join ', ')"
     }
     if ($module.module.PSObject.Properties.Name -contains 'extensionAbilities') {
       foreach ($extension in $module.module.extensionAbilities) {
@@ -273,7 +275,7 @@ try {
   Write-Output "Decimal amount inputs: $($decimalMatches.Count)"
   Write-Output "Integer-only inputs: $($numberMatches.Count) sort fields"
   Write-Output 'Amount validation: shared'
-  Write-Output 'Permissions: empty'
+  Write-Output 'Permissions: INTERNET only'
   Write-Output 'Extensions: spending form only'
   Write-Output 'Release feature flags: safe'
   Write-Output 'Routes/pages: consistent'

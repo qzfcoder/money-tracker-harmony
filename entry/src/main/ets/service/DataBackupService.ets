@@ -42,6 +42,20 @@ interface BackupAccount {
   create_time: number;
 }
 
+interface BackupInvestment {
+  id: number;
+  name: string;
+  type: number;
+  security_code: string;
+  holding_quantity: number;
+  cost_price: number;
+  current_price: number;
+  color: string;
+  sort_order: number;
+  quote_time: number;
+  create_time: number;
+}
+
 interface BackupBudget {
   id: number;
   category_id: number;
@@ -88,6 +102,7 @@ interface BackupSnapshot {
   records: BackupRecord[];
   categories: BackupCategory[];
   accounts: BackupAccount[];
+  investments?: BackupInvestment[];
   budgets: BackupBudget[];
   templates: BackupTemplate[];
   recurringBills?: BackupRecurringBill[];
@@ -97,6 +112,7 @@ export class DataBackupResult {
   recordCount: number = 0;
   categoryCount: number = 0;
   accountCount: number = 0;
+  investmentCount: number = 0;
   budgetCount: number = 0;
   templateCount: number = 0;
   recurringBillCount: number = 0;
@@ -148,6 +164,7 @@ export class DataBackupService {
       records: await DataBackupService.readRecords(store),
       categories: await DataBackupService.readCategories(store),
       accounts: await DataBackupService.readAccounts(store),
+      investments: await DataBackupService.readInvestments(store),
       budgets: await DataBackupService.readBudgets(store),
       templates: await DataBackupService.readTemplates(store),
       recurringBills: await DataBackupService.readRecurringBills(store)
@@ -162,12 +179,16 @@ export class DataBackupService {
     await store.executeSql('DELETE FROM t_recurring_bill');
     await store.executeSql('DELETE FROM t_category');
     await store.executeSql('DELETE FROM t_account');
+    await store.executeSql('DELETE FROM t_investment_position');
 
     for (const item of snapshot.categories) {
       await store.insert('t_category', DataBackupService.categoryBucket(item));
     }
     for (const item of snapshot.accounts) {
       await store.insert('t_account', DataBackupService.accountBucket(item));
+    }
+    for (const item of snapshot.investments || []) {
+      await store.insert('t_investment_position', DataBackupService.investmentBucket(item));
     }
     for (const item of snapshot.records) {
       await store.insert('t_record', DataBackupService.recordBucket(item));
@@ -239,6 +260,28 @@ export class DataBackupService {
         color: result.getString(result.getColumnIndex('color')),
         is_liability: result.getLong(result.getColumnIndex('is_liability')),
         sort_order: result.getLong(result.getColumnIndex('sort_order')),
+        create_time: result.getLong(result.getColumnIndex('create_time'))
+      });
+    }
+    result.close();
+    return list;
+  }
+
+  private static async readInvestments(store: relationalStore.RdbStore): Promise<BackupInvestment[]> {
+    const result = await store.querySql('SELECT * FROM t_investment_position ORDER BY id ASC');
+    const list: BackupInvestment[] = [];
+    while (result.goToNextRow()) {
+      list.push({
+        id: result.getLong(result.getColumnIndex('id')),
+        name: result.getString(result.getColumnIndex('name')),
+        type: result.getLong(result.getColumnIndex('type')),
+        security_code: result.getString(result.getColumnIndex('security_code')),
+        holding_quantity: result.getDouble(result.getColumnIndex('holding_quantity')),
+        cost_price: result.getDouble(result.getColumnIndex('cost_price')),
+        current_price: result.getDouble(result.getColumnIndex('current_price')),
+        color: result.getString(result.getColumnIndex('color')),
+        sort_order: result.getLong(result.getColumnIndex('sort_order')),
+        quote_time: result.getLong(result.getColumnIndex('quote_time')),
         create_time: result.getLong(result.getColumnIndex('create_time'))
       });
     }
@@ -392,6 +435,22 @@ export class DataBackupService {
     return bucket;
   }
 
+  private static investmentBucket(item: BackupInvestment): relationalStore.ValuesBucket {
+    const bucket: relationalStore.ValuesBucket = {};
+    bucket['id'] = item.id;
+    bucket['name'] = item.name;
+    bucket['type'] = item.type;
+    bucket['security_code'] = item.security_code;
+    bucket['holding_quantity'] = item.holding_quantity;
+    bucket['cost_price'] = item.cost_price;
+    bucket['current_price'] = item.current_price;
+    bucket['color'] = item.color;
+    bucket['sort_order'] = item.sort_order;
+    bucket['quote_time'] = item.quote_time;
+    bucket['create_time'] = item.create_time;
+    return bucket;
+  }
+
   private static budgetBucket(item: BackupBudget): relationalStore.ValuesBucket {
     const bucket: relationalStore.ValuesBucket = {};
     bucket['id'] = item.id;
@@ -442,6 +501,7 @@ export class DataBackupService {
     result.recordCount = snapshot.records.length;
     result.categoryCount = snapshot.categories.length;
     result.accountCount = snapshot.accounts.length;
+    result.investmentCount = snapshot.investments ? snapshot.investments.length : 0;
     result.budgetCount = snapshot.budgets.length;
     result.templateCount = snapshot.templates.length;
     result.recurringBillCount = snapshot.recurringBills ? snapshot.recurringBills.length : 0;

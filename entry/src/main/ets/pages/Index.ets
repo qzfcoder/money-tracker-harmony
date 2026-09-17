@@ -20,6 +20,8 @@ import { AppDatabase } from '../database/AppDatabase';
 import { ThemeUtil } from '../utils/ThemeUtil';
 import { ToastUtil } from '../utils/ToastUtil';
 import { SpendingCardService } from '../widget/SpendingCardService';
+import { AssetsViewModel } from '../viewmodel/AssetsViewModel';
+import { InvestmentPosition, InvestmentType } from '../model/Investment';
 
 @Entry
 @Component
@@ -29,11 +31,13 @@ struct Index {
   private settingsRepository: SettingsRepository = new SettingsRepository();
   private salaryRepository: SalaryRepository = new SalaryRepository();
   private ledgerRepository: LedgerEnhancementRepository = new LedgerEnhancementRepository();
+  @State assetsVm: AssetsViewModel = new AssetsViewModel();
 
   @State currentTab: number = 0;
   @State statisticsRefreshKey: number = 0;
   @State appState: AppState = AppState.getInstance();
   @State viewportWidth: number = 0;
+  @State viewportHeight: number = 0;
   @State userName: string = '账本';
   @State nowTime: number = Date.now();
   @State monthIncome: number = 0;
@@ -55,6 +59,8 @@ struct Index {
   @State ledgerPickerVisible: boolean = false;
   @State recordSelectMode: boolean = false;
   @State selectedRecordIds: number[] = [];
+  @State selectedAssetDeck: number = 0;
+  @State investmentRefreshing: boolean = false;
   @StorageLink('ledgerIsDarkMode') isDarkMode: boolean = false;
   private clockTimer: number = -1;
 
@@ -119,6 +125,7 @@ struct Index {
     })
     .onAreaChange((oldValue, newValue) => {
       this.viewportWidth = parseFloat(`${newValue.width}`);
+      this.viewportHeight = parseFloat(`${newValue.height}`);
     })
   }
 
@@ -1172,77 +1179,122 @@ struct Index {
   @Builder
   private AssetsTab() {
     Scroll() {
-      Column({ space: 18 }) {
-        this.PageHeader('资产', '账户与余额')
-        this.AssetSummary()
-        this.SectionTitle('账户列表', `${this.appState.accountList.length} 个`)
-        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-          ForEach(this.appState.accountList, (account: AccountModel) => {
-            this.AssetCard(account)
-          }, (account: AccountModel) => this.accountRenderKey(account))
+      Column({ space: 14 }) {
+        this.AssetHeader()
+        this.AssetSummaryDeck()
+        this.AssetSectionTitle()
+        if (this.selectedAssetDeck === 0) {
+          this.AssetAccountList()
+        } else if (this.selectedAssetDeck === 1) {
+          this.AssetInvestmentList(InvestmentType.STOCK)
+        } else {
+          this.AssetInvestmentList(InvestmentType.FUND)
         }
-        .width('100%')
       }
       .width('100%')
-      .constraintSize({ maxWidth: this.contentMaxWidth() })
+      .constraintSize({ minHeight: Math.max(0, this.viewportHeight - 64), maxWidth: this.contentMaxWidth() })
       .alignSelf(ItemAlign.Center)
-      .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 26, bottom: 96 })
+      .padding({ left: AppSpace.PAGE, right: AppSpace.PAGE, top: 12, bottom: 96 })
     }
     .backgroundColor(AppColors.CANVAS)
   }
 
   @Builder
-  private AssetSummary() {
-    Column({ space: 18 }) {
+  private AssetHeader() {
+    Row() {
+      Column({ space: 3 }) {
+        Text('资产').fontSize(28).fontWeight(FontWeight.Bold).fontColor(AppColors.INK)
+        Text('账户、股票与基金').fontSize(12).fontColor(AppColors.MUTED)
+      }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+      if (this.selectedAssetDeck > 0) {
+        Button(this.investmentRefreshing ? '…' : '⟳')
+          .fontSize(12).fontWeight(FontWeight.Bold).fontColor(AppColors.CHART_BLUE).width(36).height(36)
+          .backgroundColor(AppColors.SURFACE).borderRadius(21).margin({ right: 8 })
+          .enabled(!this.investmentRefreshing).onClick(() => this.refreshInvestmentQuotes())
+      }
+      Button('+').fontSize(12).fontColor(AppColors.SURFACE).width(36).height(36)
+        .backgroundColor(this.assetDeckColor(this.selectedAssetDeck)).borderRadius(21)
+        .onClick(() => this.openAssetManage())
+    }.width('100%').alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  private AssetSummaryDeck() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      this.AssetSummaryCard(0)
+      this.AssetSummaryCard(1)
+      this.AssetSummaryCard(2)
+    }.width('100%').height(218)
+  }
+
+  @Builder
+  private AssetSummaryCard(index: number) {
+    Column({ space: 10 }) {
       Row() {
         Row({ space: 12 }) {
-          Text('卡')
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.LEDGER)
-            .width(46)
-            .height(46)
-            .textAlign(TextAlign.Center)
-            .borderRadius(15)
-            .backgroundColor(AppColors.SURFACE_TINT)
-          Column({ space: 4 }) {
-            Text('净资产')
-              .fontSize(13)
-              .fontColor(AppColors.MUTED)
-            Text(NumberUtil.compactMoney(this.appState.totalAssets))
-              .fontSize(34)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppColors.INK)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(HorizontalAlign.Start)
+          Text(this.assetDeckMark(this.assetDeckTypeAt(index)))
+            .fontSize(14).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+            .width(38).height(38).textAlign(TextAlign.Center).borderRadius(19).backgroundColor('#30FFFFFF')
+          Column({ space: 2 }) {
+            Text(this.assetDeckTitle(this.assetDeckTypeAt(index)))
+              .fontSize(17).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+            Text(this.assetDeckSubtitle(this.assetDeckTypeAt(index)))
+              .fontSize(11).fontColor('#FFFFFFCC').maxLines(1)
+          }.alignItems(HorizontalAlign.Start)
         }
         .layoutWeight(1)
+        Text(index === 2 ? '当前' : '查看').fontSize(10).fontColor('#FFFFFFCC')
       }
       .width('100%')
 
+      Text(NumberUtil.compactMoney(this.assetDeckValue(this.assetDeckTypeAt(index))))
+        .fontSize(28).fontWeight(FontWeight.Bold).fontColor('#FFFFFF')
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
+
       Row() {
-        Text('账户余额一目了然')
-          .fontSize(13)
-          .fontColor(AppColors.MUTED)
+        Text(this.assetDeckLeftDetail(this.assetDeckTypeAt(index)))
+          .fontSize(11).fontColor('#FFFFFFCC').maxLines(1)
         Blank()
-        Text('管理')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.CHART_BLUE)
-          .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-          .backgroundColor(AppColors.SURFACE_TINT)
-          .borderRadius(AppRadius.PILL)
-          .onClick(() => router.pushUrl({ url: ROUTES.ACCOUNT_MANAGE }))
+        Text(this.assetDeckRightDetail(this.assetDeckTypeAt(index))).fontSize(11).fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF').maxLines(1)
       }
       .width('100%')
     }
-    .width('100%')
-    .padding(22)
-    .backgroundColor(AppColors.SURFACE)
-    .borderRadius(AppRadius.CARD)
-    .shadow({ radius: 24, color: AppColors.SHADOW, offsetY: 10 })
+    .width('94%').height(146).padding(16).backgroundColor(this.assetDeckColor(this.assetDeckTypeAt(index)))
+    .linearGradient({ angle: 105, colors: this.assetDeckGradient(this.assetDeckTypeAt(index)) })
+    .borderRadius(AppRadius.CARD).shadow({ radius: 16, color: '#2410263D', offsetY: 7 })
+    .position({ x: this.assetDeckOffsetX(index), y: index * 36 })
+    .zIndex(index)
+    .onClick(() => { this.selectedAssetDeck = this.assetDeckTypeAt(index); })
+  }
+
+  @Builder
+  private AssetAccountList() {
+    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+      if (this.appState.accountList.length === 0) {
+        this.AssetEmptyState('还没有账户', '添加现金、储蓄卡或信用卡账户')
+      } else {
+        ForEach(this.appState.accountList, (account: AccountModel) => {
+          this.AssetCard(account)
+        }, (account: AccountModel) => this.accountRenderKey(account))
+      }
+    }.width('100%')
+  }
+
+  @Builder
+  private AssetSectionTitle() {
+    Row() {
+      Text(this.selectedAssetDeck === 0 ? '账户列表' : this.selectedAssetDeck === 1 ? '股票持仓' : '基金持仓')
+        .fontSize(20).fontWeight(FontWeight.Bold).fontColor(AppColors.INK)
+      Blank()
+      if (this.selectedAssetDeck === 0) {
+        Text(`${this.appState.accountList.length} 个`).fontSize(12).fontColor(AppColors.MUTED)
+      } else if (this.selectedAssetDeck === 1) {
+        Text(`${this.assetsVm.positionsByType(InvestmentType.STOCK).length} 个`).fontSize(12).fontColor(AppColors.MUTED)
+      } else {
+        Text(`${this.assetsVm.positionsByType(InvestmentType.FUND).length} 个`).fontSize(12).fontColor(AppColors.MUTED)
+      }
+    }.width('100%')
   }
 
   @Builder
@@ -1285,6 +1337,59 @@ struct Index {
     .shadow({ radius: 18, color: AppColors.SHADOW, offsetY: 8 })
     .margin({ bottom: 12 })
     .onClick(() => router.pushUrl({ url: ROUTES.ACCOUNT_LEDGER, params: { accountId: account.id || 0 } }))
+  }
+
+  @Builder
+  private AssetInvestmentList(type: InvestmentType) {
+    Column({ space: 10 }) {
+      if (this.assetsVm.positionsByType(type).length === 0) {
+        this.AssetEmptyState(type === InvestmentType.STOCK ? '还没有股票持仓' : '还没有基金持仓',
+          '点击右上角 + 添加第一笔持仓')
+      } else {
+        ForEach(this.assetsVm.positionsByType(type), (item: InvestmentPosition) => {
+          this.AssetInvestmentCard(item)
+        }, (item: InvestmentPosition) => `${item.id}-${item.currentPrice}-${item.holdingQuantity}`)
+      }
+    }.width('100%')
+  }
+
+  @Builder
+  private AssetInvestmentCard(item: InvestmentPosition) {
+    Row({ space: 12 }) {
+      Text(item.type === InvestmentType.STOCK ? '股' : '基')
+        .fontSize(14).fontWeight(FontWeight.Bold).fontColor(item.color)
+        .width(44).height(44).textAlign(TextAlign.Center).borderRadius(14)
+        .backgroundColor(item.type === InvestmentType.STOCK ? AppColors.SURFACE_TINT : AppColors.softGreen())
+      Column({ space: 4 }) {
+        Text(item.name).fontSize(16).fontWeight(FontWeight.Bold).fontColor(AppColors.INK).maxLines(1)
+        Text(`${item.securityCode} · ${item.holdingQuantity} ${item.type === InvestmentType.STOCK ? '股' : '份'}`)
+          .fontSize(11).fontColor(AppColors.MUTED).maxLines(1)
+      }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+      Column({ space: 3 }) {
+        Text(NumberUtil.compactMoney(item.holdingQuantity * item.currentPrice))
+          .fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.INK).maxLines(1)
+        Text(this.assetPositionProfitText(item)).fontSize(11)
+          .fontColor(this.assetPositionProfit(item) >= 0 ? AppColors.INCOME : AppColors.EXPENSE)
+      }.alignItems(HorizontalAlign.End)
+    }
+    .width('100%').height(72).padding({ left: 15, right: 15 })
+    .backgroundColor(AppColors.SURFACE).borderRadius(AppRadius.CARD)
+    .onClick(() => router.pushUrl({
+      url: ROUTES.INVESTMENT_MANAGE,
+      params: { type: item.type, positionId: item.id || 0 }
+    }))
+  }
+
+  @Builder
+  private AssetEmptyState(title: string, detail: string) {
+    Column({ space: 8 }) {
+      Text(title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppColors.INK)
+      Text(detail).fontSize(12).fontColor(AppColors.MUTED)
+      Button('去添加').fontSize(13).fontWeight(FontWeight.Bold).fontColor(AppColors.SURFACE)
+        .backgroundColor(this.assetDeckColor(this.selectedAssetDeck)).borderRadius(AppRadius.PILL)
+        .onClick(() => this.openAssetManage())
+    }.width('100%').height(150).justifyContent(FlexAlign.Center)
+      .backgroundColor(AppColors.SURFACE).borderRadius(AppRadius.CARD)
   }
 
   @Builder
@@ -1593,6 +1698,10 @@ struct Index {
       this.appState.setLedgerFilter(this.activeLedger);
       this.clearRecordSelection();
       await this.appState.refreshAll();
+      await this.replaceAssetsSnapshot();
+      if (this.currentTab === 3 && this.assetsVm.positions.length > 0) {
+        await this.refreshInvestmentQuotes(false);
+      }
     } catch (error) {
     }
     await this.refreshHomeMetrics();
@@ -1656,6 +1765,100 @@ struct Index {
   private accountRenderKey(account: AccountModel): string {
     const balanceCent = Math.round(account.balance * 100);
     return `${account.id}-${account.name}-${account.type}-${balanceCent}-${account.isLiability ? 1 : 0}-${account.sortOrder}-${account.color}`;
+  }
+
+  private assetDeckTypeAt(index: number): number {
+    if (this.selectedAssetDeck === 0) return index === 0 ? 2 : index === 1 ? 1 : 0;
+    if (this.selectedAssetDeck === 1) return index === 0 ? 2 : index === 1 ? 0 : 1;
+    return index === 0 ? 1 : index === 1 ? 0 : 2;
+  }
+
+  private assetDeckTitle(type: number): string {
+    return type === 0 ? '净资产' : type === 1 ? '股票' : '基金';
+  }
+
+  private assetDeckMark(type: number): string {
+    return type === 0 ? '资' : type === 1 ? '股' : '基';
+  }
+
+  private assetDeckSubtitle(type: number): string {
+    if (type === 0) return '账户余额 + 投资市值';
+    const investmentType = type === 1 ? InvestmentType.STOCK : InvestmentType.FUND;
+    return `${this.assetsVm.positionsByType(investmentType).length} 个持仓`;
+  }
+
+  private assetDeckValue(type: number): number {
+    return type === 0 ? this.assetsVm.totalAssets : type === 1 ? this.assetsVm.stockValue : this.assetsVm.fundValue;
+  }
+
+  private assetDeckLeftDetail(type: number): string {
+    if (type === 0) return `账户净值 ${NumberUtil.compactMoney(this.assetsVm.accountNetAssets)}`;
+    return type === 1 ? '股票当前市值' : '基金当前市值';
+  }
+
+  private assetDeckRightDetail(type: number): string {
+    if (type === 0) return `投资 ${NumberUtil.compactMoney(this.assetsVm.stockValue + this.assetsVm.fundValue)}`;
+    const profit = type === 1 ? this.assetsVm.stockProfit : this.assetsVm.fundProfit;
+    return `${profit >= 0 ? '+' : ''}${NumberUtil.compactMoney(profit)}`;
+  }
+
+  private assetDeckColor(type: number): string {
+    if (type === 0) return AppColors.LEDGER_DARK;
+    return type === 1 ? AppColors.CHART_BLUE : AppColors.CHART_GREEN;
+  }
+
+  private assetDeckGradient(type: number): Array<[ResourceColor, number]> {
+    if (type === 0) {
+      return [['#0D2035', 0], ['#1B4668', 1]];
+    }
+    if (type === 1) {
+      return [['#246BE8', 0], ['#48A7FF', 1]];
+    }
+    return [['#13A86B', 0], ['#45D6AE', 1]];
+  }
+
+  private assetDeckOffsetX(index: number): number {
+    return index === 0 ? 22 : index === 1 ? 11 : 0;
+  }
+
+  private assetPositionProfit(item: InvestmentPosition): number {
+    return item.holdingQuantity * (item.currentPrice - item.costPrice);
+  }
+
+  private assetPositionProfitText(item: InvestmentPosition): string {
+    const value = this.assetPositionProfit(item);
+    return `${value >= 0 ? '+' : ''}${NumberUtil.compactMoney(value)}`;
+  }
+
+  private openAssetManage(): void {
+    if (this.selectedAssetDeck === 0) {
+      router.pushUrl({ url: ROUTES.ACCOUNT_MANAGE });
+      return;
+    }
+    router.pushUrl({
+      url: ROUTES.INVESTMENT_MANAGE,
+      params: { type: this.selectedAssetDeck === 1 ? InvestmentType.STOCK : InvestmentType.FUND }
+    });
+  }
+
+  private async refreshInvestmentQuotes(showResult: boolean = true): Promise<void> {
+    if (this.investmentRefreshing) return;
+    this.investmentRefreshing = true;
+    try {
+      const updated = await this.assetsVm.refreshInvestmentQuotes();
+      await this.replaceAssetsSnapshot();
+      if (showResult) {
+        ToastUtil.show(updated > 0 ? `已更新 ${updated} 个持仓` : '行情更新失败，已保留上次价格');
+      }
+    } finally {
+      this.investmentRefreshing = false;
+    }
+  }
+
+  private async replaceAssetsSnapshot(): Promise<void> {
+    const nextVm = new AssetsViewModel();
+    await nextVm.refresh();
+    this.assetsVm = nextVm;
   }
 
   private async refreshHomeMetrics(): Promise<void> {

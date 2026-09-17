@@ -7,6 +7,7 @@ export enum AccountType {
   OTHER = 6
 }
 
+
 export interface AccountModel {
   id?: number;
   name: string;
@@ -19,4 +20,3 @@ export interface AccountModel {
   sortOrder: number;
   createTime: number;
 }
-

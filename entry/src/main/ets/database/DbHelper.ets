@@ -39,6 +39,19 @@ export const CREATE_TABLE_SQL: string[] = [
     sort_order INTEGER DEFAULT 0,
     create_time INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS t_investment_position (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type INTEGER NOT NULL,
+    security_code TEXT NOT NULL,
+    holding_quantity REAL DEFAULT 0,
+    cost_price REAL DEFAULT 0,
+    current_price REAL DEFAULT 0,
+    color TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    quote_time INTEGER DEFAULT 0,
+    create_time INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS t_budget (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER DEFAULT 0,
@@ -113,6 +126,7 @@ export const CREATE_INDEX_SQL: string[] = [
   'CREATE INDEX IF NOT EXISTS idx_record_ledger ON t_record(ledger_name)',
   'CREATE INDEX IF NOT EXISTS idx_category ON t_record(category_id)',
   'CREATE INDEX IF NOT EXISTS idx_account ON t_record(account_id)',
+  'CREATE INDEX IF NOT EXISTS idx_investment_type ON t_investment_position(type, sort_order)',
   'CREATE INDEX IF NOT EXISTS idx_budget_month ON t_budget(month)',
   'CREATE INDEX IF NOT EXISTS idx_auto_rule_type ON t_auto_rule(rule_type)',
   'CREATE INDEX IF NOT EXISTS idx_auto_bill_status ON t_auto_bill(status)',

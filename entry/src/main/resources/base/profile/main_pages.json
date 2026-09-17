@@ -10,6 +10,7 @@
     "pages/AccountPicker",
     "pages/CategoryManage",
     "pages/AccountManage",
+    "pages/InvestmentManage",
     "pages/BudgetSetting",
     "pages/SalaryManage",
     "pages/RecurringBill",

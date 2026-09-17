@@ -111,10 +111,11 @@ def main() -> None:
         ("salary", "工资怎么花，心里有数", "按月薪换算支出，看到真实消费进度", "raw_salary.png"),
         ("recurring", "固定收支，不用重复记", "房租、会员、工资等账单按周期生成", "raw_recurring.png"),
         ("widget", "不用打开 App，也能看账", "桌面同步今日、本月、收入与结余", "current-card-page.png"),
+        ("investment", "股票基金，也放进总资产", "自动更新最近行情，市值盈亏一眼看清", "raw_investment.jpeg"),
     ]
     generate_set("release-phone", "phone", (1080, 1920), pages)
     generate_set("release-tablet", "tablet", (1280, 1920), pages)
-    print("Generated 12 version-release JPEG images")
+    print("Generated 14 version-release JPEG images")
 
 
 if __name__ == "__main__":

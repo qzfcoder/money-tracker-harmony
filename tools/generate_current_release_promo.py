@@ -119,6 +119,8 @@ def main() -> None:
          [("周期账单", SKY), ("到期生成", GREEN)]),
         ("不用打开 App，也能看账", "桌面卡片同步今日、本月、收入与结余", "current-card-page.png",
          [("桌面卡片", SKY), ("自动汇总", GREEN)]),
+        ("股票基金，也放进总资产", "最近价格与净值自动更新，市值盈亏一眼看清", "raw_investment.jpeg",
+         [("独立持仓", SKY), ("自动更新", GREEN)]),
     ]
     for index, page in enumerate(pages, 1):
         render(index, *page)

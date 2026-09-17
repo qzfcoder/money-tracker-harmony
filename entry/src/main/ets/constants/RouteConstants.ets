@@ -9,6 +9,7 @@ export class ROUTES {
   static readonly ACCOUNT_PICKER: string = 'pages/AccountPicker';
   static readonly CATEGORY_MANAGE: string = 'pages/CategoryManage';
   static readonly ACCOUNT_MANAGE: string = 'pages/AccountManage';
+  static readonly INVESTMENT_MANAGE: string = 'pages/InvestmentManage';
   static readonly BUDGET_SETTING: string = 'pages/BudgetSetting';
   static readonly SALARY_MANAGE: string = 'pages/SalaryManage';
   static readonly RECURRING_BILL: string = 'pages/RecurringBill';

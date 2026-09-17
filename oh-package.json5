@@ -1,7 +1,7 @@
 {
   "modelVersion": "6.1.1",
   "name": "local_money_tracker",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A local-first HarmonyOS money tracker.",
   "main": "",
   "author": "",

@@ -20,7 +20,11 @@ export class NumberUtil {
   }
 
   static toCentSafe(value: string): number {
-    const normalized = NumberUtil.normalizeAmountInput(value).trim();
+    return NumberUtil.toDecimalSafe(value, 2);
+  }
+
+  static toDecimalSafe(value: string, decimalPlaces: number): number {
+    const normalized = NumberUtil.normalizeDecimalInput(value, decimalPlaces).trim();
     if (!normalized) {
       return 0;
     }
@@ -28,16 +32,21 @@ export class NumberUtil {
     if (Number.isNaN(numberValue)) {
       return 0;
     }
-    return Math.round(numberValue * 100) / 100;
+    const scale = Math.pow(10, decimalPlaces);
+    return Math.round(numberValue * scale) / scale;
   }
 
   static normalizeAmountInput(value: string): string {
+    return NumberUtil.normalizeDecimalInput(value, 2);
+  }
+
+  static normalizeDecimalInput(value: string, decimalPlaces: number): string {
     const cleaned = value.replace(/[^0-9.]/g, '');
     const parts = cleaned.split('.');
     if (parts.length <= 1) {
       return cleaned;
     }
     const integerPart = parts[0] || '0';
-    return `${integerPart}.${parts.slice(1).join('').substring(0, 2)}`;
+    return `${integerPart}.${parts.slice(1).join('').substring(0, decimalPlaces)}`;
   }
 }
